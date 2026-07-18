@@ -97,18 +97,22 @@ input#search::placeholder{color:var(--chalk-dim);}
 .flip-wrap{width:230px;height:330px;-webkit-perspective:1200px;perspective:1200px;cursor:pointer;}
 .flip-inner{position:relative;width:100%;height:100%;-webkit-transition:-webkit-transform .6s cubic-bezier(.4,.2,.2,1);transition:transform .6s cubic-bezier(.4,.2,.2,1);-webkit-transform-style:preserve-3d;transform-style:preserve-3d;-webkit-transform:rotateY(0deg);transform:rotateY(0deg);}
 .flip-wrap.flipped .flip-inner{-webkit-transform:rotateY(180deg);transform:rotateY(180deg);}
-.card-face{position:absolute;inset:0;border-radius:16px;-webkit-backface-visibility:hidden;backface-visibility:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.45);overflow:hidden;-webkit-transform:rotateY(0deg) translateZ(0);transform:rotateY(0deg) translateZ(0);}
-.card-face.back{-webkit-transform:rotateY(180deg) translateZ(0);transform:rotateY(180deg) translateZ(0);padding:20px 18px;display:flex;flex-direction:column;}
+/* card-face only handles the 3D transform + hiding; it must NOT also carry border-radius/overflow —
+   combining those with backface-visibility on iOS Safari breaks the hiding and the hidden face
+   shows through as a mirrored "reflection". Visual clipping/background live on the inner wrapper. */
+.card-face{position:absolute;inset:0;-webkit-backface-visibility:hidden;backface-visibility:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.45);-webkit-transform:rotateY(0deg) translateZ(0);transform:rotateY(0deg) translateZ(0);}
+.card-face.back{-webkit-transform:rotateY(180deg) translateZ(0);transform:rotateY(180deg) translateZ(0);}
 
 .fifa-card{width:100%;height:100%;border-radius:16px;position:relative;padding:16px 14px;overflow:hidden;}
 .fifa-card.tier-bronze{background:linear-gradient(155deg,#c98a5e,#7a4326 60%,#5c3018);}
 .fifa-card.tier-silver{background:linear-gradient(155deg,#dbe2e8,#9aa5b1 55%,#5f6771);}
 .fifa-card.tier-gold{background:linear-gradient(155deg,var(--gold-light),var(--gold) 55%,#8a6c14);}
 .fifa-card.tier-legendary{background:linear-gradient(155deg,#9a6fe0,#5b3aa0 55%,#241246);}
-.card-face.back.tier-bronze{background:linear-gradient(155deg,#f0d3ba,#e0b48f 55%,#c98a5e);}
-.card-face.back.tier-silver{background:linear-gradient(155deg,#ffffff,#eef1f3 55%,#d3d9dd);}
-.card-face.back.tier-gold{background:linear-gradient(155deg,#fff3d1,#fce8b0 55%,var(--gold-light));}
-.card-face.back.tier-legendary{background:linear-gradient(155deg,#d9c6f5,#c4a8f0 55%,#9a6fe0);}
+.card-back{width:100%;height:100%;border-radius:16px;position:relative;padding:20px 18px;overflow:hidden;display:flex;flex-direction:column;}
+.card-back.tier-bronze{background:linear-gradient(155deg,#f0d3ba,#e0b48f 55%,#c98a5e);}
+.card-back.tier-silver{background:linear-gradient(155deg,#ffffff,#eef1f3 55%,#d3d9dd);}
+.card-back.tier-gold{background:linear-gradient(155deg,#fff3d1,#fce8b0 55%,var(--gold-light));}
+.card-back.tier-legendary{background:linear-gradient(155deg,#d9c6f5,#c4a8f0 55%,#9a6fe0);}
 .fifa-card::before{
   content:"";position:absolute;inset:0;
   background:linear-gradient(115deg, transparent 20%, rgba(255,255,255,0.35) 32%, transparent 44%);
@@ -288,37 +292,41 @@ function playerStats(){
 /* ============ Card rendering ============ */
 function cardFrontHTML(s, overall, tier, stars, rank){
   return `
-    <div class="card-face fifa-card tier-${tier}">
-      <div class="card-top">
-        <div>
-          <div class="card-rating mono">${overall}</div>
-          <div class="card-stars">${starString(stars)}</div>
+    <div class="card-face">
+      <div class="fifa-card tier-${tier}">
+        <div class="card-top">
+          <div>
+            <div class="card-rating mono">${overall}</div>
+            <div class="card-stars">${starString(stars)}</div>
+          </div>
+          <div class="card-rank">#${rank}</div>
         </div>
-        <div class="card-rank">#${rank}</div>
+        <div class="card-avatar-wrap"><div class="card-avatar">${defaultAvatarSVG(s.name)}</div></div>
+        <div class="card-name">${escapeHtml(s.name)}</div>
+        <div class="card-club-line">Anyday FC</div>
+        <div class="card-stats">
+          <div><span>SPD</span><b>50</b></div>
+          <div><span>STA</span><b>50</b></div>
+          <div><span>GP</span><b>${s.count}</b></div>
+          <div><span>OVR</span><b>${overall}</b></div>
+        </div>
+        <div class="tier-badge">${tier}</div>
+        <div class="flip-hint">↻ tap to flip</div>
       </div>
-      <div class="card-avatar-wrap"><div class="card-avatar">${defaultAvatarSVG(s.name)}</div></div>
-      <div class="card-name">${escapeHtml(s.name)}</div>
-      <div class="card-club-line">Anyday FC</div>
-      <div class="card-stats">
-        <div><span>SPD</span><b>50</b></div>
-        <div><span>STA</span><b>50</b></div>
-        <div><span>GP</span><b>${s.count}</b></div>
-        <div><span>OVR</span><b>${overall}</b></div>
-      </div>
-      <div class="tier-badge">${tier}</div>
-      <div class="flip-hint">↻ tap to flip</div>
     </div>
   `;
 }
 function cardBackHTML(s, overall, tier){
   return `
-    <div class="card-face back tier-${tier}">
-      <div class="back-label">Season stats</div>
-      <div class="back-row"><div class="bl">Games played</div><div class="bv">${s.count}</div></div>
-      <div class="back-row"><div class="bl">First game</div><div class="bv" style="font-size:13px;">${fmtDate(s.first)}</div></div>
-      <div class="back-row"><div class="bl">Last game</div><div class="bv" style="font-size:13px;">${fmtDate(s.last)}</div></div>
-      <div class="back-row"><div class="bl">Rating calc</div><div class="bv" style="font-size:13px;">${s.count} <small>/ ${WEEKS_PER_SEASON} weeks</small></div></div>
-      <div class="flip-hint">↻ tap to flip back</div>
+    <div class="card-face back">
+      <div class="card-back tier-${tier}">
+        <div class="back-label">Season stats</div>
+        <div class="back-row"><div class="bl">Games played</div><div class="bv">${s.count}</div></div>
+        <div class="back-row"><div class="bl">First game</div><div class="bv" style="font-size:13px;">${fmtDate(s.first)}</div></div>
+        <div class="back-row"><div class="bl">Last game</div><div class="bv" style="font-size:13px;">${fmtDate(s.last)}</div></div>
+        <div class="back-row"><div class="bl">Rating calc</div><div class="bv" style="font-size:13px;">${s.count} <small>/ ${WEEKS_PER_SEASON} weeks</small></div></div>
+        <div class="flip-hint">↻ tap to flip back</div>
+      </div>
     </div>
   `;
 }
