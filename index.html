@@ -684,12 +684,6 @@ function render(){
     <div class="view ${state.view==='players'?'active':''}" id="players-view">${state.view==='players' ? renderPlayers() : ''}</div>
     <div class="view ${state.view==='analytics'?'active':''}" id="analytics-view">${state.view==='analytics' ? renderAnalytics() : ''}</div>
     <div class="view ${state.view==='add'?'active':''}" id="add-view">${state.view==='add' ? renderAddMatch() : ''}</div>
-    <div class="note">
-      <b>How this was built:</b> parsed from every "Playlist" / team-roster message in both WhatsApp chat exports. For each match, the message with the most filled slots (12 full, or at least 5) was taken as the final roster, then grouped by inferred match date from the surrounding conversation.
-      <br><br>
-      <b>Known limitations:</b> a player only counts as having played if their name has an actual ✅/☑️ checkmark next to it in the final roster message — plain sign-up sheets with no confirmation ticks are not counted, even if a venue was proposed. This dropped sign-ups that never got confirmed (several were explicitly cancelled in the chat) and corrected several rosters where an earlier, unticked message had been used instead of the real final one. The match list was then cross-checked against a manually recalled list of 32 game days for 2026; 6 matches were added back in (2026-02-04, 2026-04-22, 2026-05-17, 2026-05-22, 2026-06-14, 2026-06-19) — two of these (05-17, 05-22) lacked a checkmarked roster but were confirmed by direct recollection and restored using the sign-up sheet instead. Names are shown as typed in WhatsApp with a few manual alias merges applied (e.g. "Soh" → "Sohail", "Ichha" / "Iccha" unified, "Vik" / "Viks" unified). Anyone flagged with a ₹100 fee was treated as a drop-out — excluded from that match's player list and shown as a "dropped out" tag on the Players tab. Payments are the actual "Total: ₹X" ground cost and "Per Head: ₹X" figures posted in chat for each game, not individual late/no-show fees; games that never had a Total posted are assumed to cost ₹4500 (split evenly per player) and marked "estimated" on the Analytics tab. Ground names are grouped by base venue (e.g. "Olympians Arena" counts as Apollo; TBD/unlisted venues are hidden from the filter).
-    </div>
-    <footer class="tag">${totalMatches} matches · generated from chat export</footer>
   `;
 
   const searchEl = document.getElementById('search');
