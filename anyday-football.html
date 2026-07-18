@@ -94,11 +94,11 @@ input#search::placeholder{color:var(--chalk-dim);}
 
 /* ---------- FIFA card ---------- */
 .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:22px;justify-items:center;}
-.flip-wrap{width:230px;height:330px;perspective:1200px;cursor:pointer;}
-.flip-inner{position:relative;width:100%;height:100%;transition:transform .6s cubic-bezier(.4,.2,.2,1);transform-style:preserve-3d;}
-.flip-wrap.flipped .flip-inner{transform:rotateY(180deg);}
-.card-face{position:absolute;inset:0;border-radius:16px;backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.45);overflow:hidden;}
-.card-face.back{transform:rotateY(180deg);padding:20px 18px;display:flex;flex-direction:column;}
+.flip-wrap{width:230px;height:330px;-webkit-perspective:1200px;perspective:1200px;cursor:pointer;}
+.flip-inner{position:relative;width:100%;height:100%;-webkit-transition:-webkit-transform .6s cubic-bezier(.4,.2,.2,1);transition:transform .6s cubic-bezier(.4,.2,.2,1);-webkit-transform-style:preserve-3d;transform-style:preserve-3d;-webkit-transform:rotateY(0deg);transform:rotateY(0deg);}
+.flip-wrap.flipped .flip-inner{-webkit-transform:rotateY(180deg);transform:rotateY(180deg);}
+.card-face{position:absolute;inset:0;border-radius:16px;-webkit-backface-visibility:hidden;backface-visibility:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.45);overflow:hidden;-webkit-transform:rotateY(0deg) translateZ(0);transform:rotateY(0deg) translateZ(0);}
+.card-face.back{-webkit-transform:rotateY(180deg) translateZ(0);transform:rotateY(180deg) translateZ(0);padding:20px 18px;display:flex;flex-direction:column;}
 
 .fifa-card{width:100%;height:100%;border-radius:16px;position:relative;padding:16px 14px;overflow:hidden;}
 .fifa-card.tier-bronze{background:linear-gradient(155deg,#c98a5e,#7a4326 60%,#5c3018);}
