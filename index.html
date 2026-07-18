@@ -643,7 +643,7 @@ function render(){
 
   document.getElementById('app').innerHTML = `
     <h1>⚽ Anyday Football — Match Archive</h1>
-    <div class="sub">Extracted from the Anyday Midweek &amp; Weekend Games WhatsApp chats · ${fmtDate(first.date)} – ${fmtDate(last.date)}</div>
+    <div class="sub">Anyday Midweek &amp; Weekend Games ${fmtDate(first.date)} – ${fmtDate(last.date)}</div>
     ${state.unsaved ? `<div class="unsaved-banner">
       <span>You've added match(es) not yet published to the group — download the file and upload it into the matches/ folder on GitHub.</span>
       <button id="download-banner-btn">⬇ Download match file</button>
