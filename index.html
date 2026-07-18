@@ -322,12 +322,45 @@ footer.tag{text-align:center;color:var(--chalk-dim);font-size:11.5px;margin-top:
 <body>
 <div id="app"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-/* ============ Storage adapter (works inside Claude artifacts AND standalone hosting) ============ */
+/* ============ Optional shared backend (Supabase) ============
+   Fill these in with your own Supabase project's URL and anon key
+   to give this app a real, shared database across every device.
+   Leave them as-is to keep running in local/device-only mode. */
+const SUPABASE_URL = 'https://nszzhghwhevxcybzprlk.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_jSgeli_BnshhZwxeBkwTEQ_ccDXobfS';
+
+function isSupabaseConfigured(){
+  return SUPABASE_URL && SUPABASE_ANON_KEY &&
+    SUPABASE_URL.indexOf('YOUR_') !== 0 && SUPABASE_ANON_KEY.indexOf('YOUR_') !== 0;
+}
+let _supabaseClient = null;
+function getSupabase(){
+  if(!isSupabaseConfigured()) return null;
+  if(!_supabaseClient && window.supabase){
+    _supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  }
+  return _supabaseClient;
+}
+function storageModeLabel(){
+  if(typeof window.storage !== 'undefined' && window.storage) return 'Running inside Claude — data is shared via Claude\'s preview storage.';
+  if(getSupabase()) return 'Connected to Supabase — data is shared with everyone using this link.';
+  return 'Local demo mode — data is only stored on this device/browser. Configure Supabase in index.html for a real shared community.';
+}
+
 const storageAdapter = {
   async get(key, shared){
     if(typeof window.storage !== 'undefined' && window.storage){
       try{ return await window.storage.get(key, shared); }catch(e){ return null; }
+    }
+    const sb = getSupabase();
+    if(sb){
+      try{
+        const { data, error } = await sb.from('kv_store').select('value').eq('key', key).maybeSingle();
+        if(error || !data) return null;
+        return {key, value: data.value, shared:true};
+      }catch(e){ return null; }
     }
     try{ const v = localStorage.getItem(key); return v ? {key, value:v, shared:!!shared} : null; }catch(e){ return null; }
   },
@@ -335,17 +368,43 @@ const storageAdapter = {
     if(typeof window.storage !== 'undefined' && window.storage){
       try{ return await window.storage.set(key, value, shared); }catch(e){ return null; }
     }
+    const sb = getSupabase();
+    if(sb){
+      try{
+        const { error } = await sb.from('kv_store').upsert({key, value, updated_at: new Date().toISOString()});
+        if(error) return null;
+        return {key, value, shared:true};
+      }catch(e){ return null; }
+    }
     try{ localStorage.setItem(key, value); return {key, value, shared:!!shared}; }catch(e){ return null; }
   },
   async delete(key, shared){
     if(typeof window.storage !== 'undefined' && window.storage){
       try{ return await window.storage.delete(key, shared); }catch(e){ return null; }
     }
+    const sb = getSupabase();
+    if(sb){
+      try{
+        const { error } = await sb.from('kv_store').delete().eq('key', key);
+        if(error) return null;
+        return {key, deleted:true, shared:true};
+      }catch(e){ return null; }
+    }
     try{ localStorage.removeItem(key); return {key, deleted:true, shared:!!shared}; }catch(e){ return null; }
   },
   async list(prefix, shared){
     if(typeof window.storage !== 'undefined' && window.storage){
       try{ return await window.storage.list(prefix, shared); }catch(e){ return {keys:[]}; }
+    }
+    const sb = getSupabase();
+    if(sb){
+      try{
+        let q = sb.from('kv_store').select('key');
+        if(prefix) q = q.like('key', prefix+'%');
+        const { data, error } = await q;
+        if(error || !data) return {keys:[]};
+        return {keys: data.map(r=>r.key), prefix, shared:true};
+      }catch(e){ return {keys:[]}; }
     }
     try{
       const keys = [];
@@ -483,7 +542,7 @@ function shell(inner, showBack){
         <button class="switch-btn" data-act="switch">Switch profile</button></div>` : ''}
     </header>
     ${inner}
-    <footer class="tag">Demo build — WhatsApp registration is simulated locally for this prototype.</footer>
+    <footer class="tag">${storageModeLabel()}</footer>
   </div>
   <button class="admin-fab" title="Admin" data-act="open-admin">⚙</button>`;
 }
