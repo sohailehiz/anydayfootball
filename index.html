@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anyday Football — Match Archive</title>
+<style>
+:root{
+  --bg:#0b0f14; --panel:#131a22; --panel2:#1a2330; --line:rgba(255,255,255,0.08);
+  --text:#eef2f6; --dim:rgba(238,242,246,0.6); --gold:#ffcf4d; --green:#3ddc84;
+  --mid:#5b9dff; --week:#ff8a5b; --danger:#ff6a6a; --radius:12px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;color:var(--text);}
+.wrap{max-width:1100px;margin:0 auto;padding:24px 18px 60px;}
+h1{font-size:clamp(24px,4vw,34px);margin:0 0 4px;letter-spacing:-0.5px;}
+.sub{color:var(--dim);font-size:14px;margin-bottom:20px;}
+.stat-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:22px;}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 18px;flex:1;min-width:120px;}
+.stat .n{font-size:26px;font-weight:700;}
+.stat .l{font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;margin-top:2px;}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px;position:sticky;top:0;background:var(--bg);padding:10px 0;z-index:5;}
+.tabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px;}
+.tab-btn{background:none;border:none;color:var(--dim);padding:8px 16px;border-radius:999px;font-size:13px;font-weight:600;cursor:pointer;}
+.tab-btn.active{background:var(--panel2);color:var(--text);}
+.pill-group{display:flex;gap:6px;}
+.pill{background:var(--panel);border:1px solid var(--line);color:var(--dim);padding:8px 14px;border-radius:999px;font-size:13px;cursor:pointer;font-weight:600;}
+.pill.active{color:var(--bg);background:var(--gold);}
+.pill.active[data-grp="all"]{background:var(--text);}
+.pill.active[data-grp="m"]{background:var(--mid);}
+.pill.active[data-grp="w"]{background:var(--week);}
+input#search{flex:1;min-width:160px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:9px 16px;color:var(--text);font-size:13px;}
+input#search::placeholder{color:var(--dim);}
+.view{display:none;}
+.view.active{display:block;}
+.match-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:12px;}
+.match-top{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+.match-date{font-size:16px;font-weight:700;}
+.match-date .wd{color:var(--dim);font-weight:500;font-size:13px;margin-left:6px;}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;letter-spacing:0.3px;text-transform:uppercase;}
+.badge.m{background:rgba(91,157,255,0.15);color:var(--mid);}
+.badge.w{background:rgba(255,138,91,0.15);color:var(--week);}
+.match-meta{font-size:12.5px;color:var(--dim);}
+.chip-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+.chip{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:5px 9px;font-size:12.5px;display:flex;align-items:center;gap:5px;cursor:pointer;}
+.chip:hover{border-color:var(--gold);}
+.chip .tag{font-size:9.5px;font-weight:700;padding:1px 5px;border-radius:5px;text-transform:uppercase;}
+.tag.late{background:rgba(255,207,77,0.18);color:var(--gold);}
+.tag.ns{background:rgba(255,106,106,0.18);color:var(--danger);}
+.tag.g{background:rgba(61,220,132,0.18);color:var(--green);}
+.count-pill{font-size:12px;color:var(--dim);}
+.empty{text-align:center;color:var(--dim);padding:40px 0;}
+table{width:100%;border-collapse:collapse;}
+.player-table .row{display:flex;align-items:center;padding:10px 6px;border-bottom:1px solid var(--line);cursor:pointer;}
+.player-table .row:hover{background:var(--panel2);}
+.player-table .rank{width:32px;color:var(--dim);font-size:12px;}
+.player-table .name{flex:1;font-size:14px;font-weight:600;}
+.player-table .bar-track{flex:2;background:rgba(255,255,255,0.06);border-radius:6px;height:8px;margin:0 12px;overflow:hidden;}
+.player-table .bar-fill{height:100%;background:linear-gradient(90deg,var(--mid),var(--gold));}
+.player-table .cnt{width:34px;text-align:right;font-family:monospace;font-size:13px;color:var(--dim);}
+.note{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 18px;font-size:12.5px;color:var(--dim);line-height:1.6;margin-top:26px;}
+.note b{color:var(--text);}
+.player-detail{margin-top:6px;font-size:12.5px;color:var(--dim);}
+.back-btn{background:none;border:1px solid var(--line);color:var(--dim);border-radius:999px;padding:6px 14px;font-size:12.5px;cursor:pointer;margin-bottom:14px;}
+footer.tag{text-align:center;color:var(--dim);font-size:11.5px;margin-top:40px;}
+.form-group{margin-bottom:14px;}
+.form-group label{display:block;font-size:12.5px;color:var(--dim);margin-bottom:6px;font-weight:600;}
+.form-input, .form-select, textarea.form-input{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13.5px;font-family:inherit;}
+.form-input:focus, .form-select:focus, textarea.form-input:focus{outline:none;border-color:var(--gold);}
+textarea.form-input{resize:vertical;min-height:90px;line-height:1.5;}
+.form-row{display:flex;gap:12px;flex-wrap:wrap;}
+.form-row .form-group{flex:1;min-width:160px;}
+.form-hint{font-size:11.5px;color:var(--dim);}
+.btn-primary{background:var(--gold);color:var(--bg);border:none;border-radius:999px;padding:11px 22px;font-size:13.5px;font-weight:700;cursor:pointer;}
+.btn-primary:hover{opacity:0.9;}
+.btn-secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:11px 22px;font-size:13.5px;font-weight:700;cursor:pointer;}
+.btn-secondary:hover{border-color:var(--gold);}
+.unsaved-banner{background:var(--gold);color:var(--bg);padding:10px 16px;border-radius:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;font-weight:600;flex-wrap:wrap;}
+.unsaved-banner button{background:var(--bg);color:var(--gold);border:none;border-radius:999px;padding:7px 14px;font-weight:700;cursor:pointer;font-size:12.5px;}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script id="embedded-fallback" type="application/json">[{"date":"2025-10-26","yr":"2025","wd":"Sun","grp":"w","loc":"Apollo","time":"7am - 830am (Extendable)","p":[{"n":"Rishi"},{"n":"Rahul"},{"n":"Vikranth"},{"n":"Vikranth","g":1},{"n":"Kriti"},{"n":"Laya"},{"n":"Kaushik"},{"n":"Vivi"},{"n":"Vivi","g":1},{"n":"Sohail"},{"n":"Neil"},{"n":"Arya"},{"n":"Ninad"},{"n":"Laya","g":1},{"n":"Sampath"},{"n":"Ichha"},{"n":"Asad"},{"n":"Aditya"}],"d":[],"total":6000,"perHead":322},{"date":"2025-11-23","yr":"2025","wd":"Sun","grp":"w","loc":"Apollo","time":"7am - 830am","p":[{"n":"Asad"},{"n":"Munish"},{"n":"Viks"},{"n":"Rahul"},{"n":"Srav"},{"n":"Aastha"},{"n":"Anush"}],"d":[{"n":"Mandar","f":100},{"n":"Aishna","f":100}],"total":3000,"perHead":254},{"date":"2025-12-10","yr":"2025","wd":"Wed","grp":"m","loc":"Apollo","time":"8.03pm","p":[{"n":"Megha"},{"n":"Sampath"},{"n":"Vineet"},{"n":"Viks"},{"n":"Rahul"},{"n":"Sohail"},{"n":"Vishnu"},{"n":"Srav"},{"n":"Laya"},{"n":"Vishaal"},{"n":"Kushal"},{"n":"Sid"}],"d":[{"n":"Ichha","f":100}],"total":4550,"perHead":342},{"date":"2025-12-21","yr":"2025","wd":"Sun","grp":"w","loc":"Apollo (booked)","time":null,"p":[{"n":"Viks"},{"n":"Munish"},{"n":"Vineet"},{"n":"Vishnu"},{"n":"Ansuman"},{"n":"Nilesh"},{"n":"Ichha"},{"n":"Sohail"},{"n":"Rahul"},{"n":"Sampath"},{"n":"Sid"}],"d":[{"n":"Laya","f":100}],"total":6040,"perHead":456},{"date":"2026-01-07","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo (Confirmed)","time":"8pm-930pm","p":[{"n":"Vivi"},{"n":"Viks"},{"n":"Rahul"},{"n":"Srav"},{"n":"Kushal"},{"n":"Megha"},{"n":"Sohail"},{"n":"Ayushi"},{"n":"Vineet"},{"n":"Vishnu"},{"n":"Sampath"},{"n":"Laya"},{"n":"Asad"}],"d":[],"total":4510,"perHead":346},{"date":"2026-01-14","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo","time":"8pm-10pm","p":[{"n":"Ayushi"},{"n":"Aastha","l":1,"f":50},{"n":"Dhruv"},{"n":"Aishna"},{"n":"Rahul"},{"n":"Vivi"},{"n":"Kriti"},{"n":"Anush"},{"n":"Sohail","l":1,"f":50},{"n":"Disha"},{"n":"Viks"},{"n":"Rohan"},{"n":"Ninad"},{"n":"Vamsi"},{"n":"Laya"},{"n":"Vineet"},{"n":"Asad"}],"d":[{"n":"Ichha","f":100}]},{"date":"2026-01-21","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo","time":"8pm - 9.30pm","p":[{"n":"Viks"},{"n":"Laya"},{"n":"Srav"},{"n":"Vivek"},{"n":"Sampath"},{"n":"Kaushik"},{"n":"Vishnu"},{"n":"Megha"},{"n":"Keshav"},{"n":"Rahul"},{"n":"Vishaal"}],"d":[{"n":"Ninad","f":100}]},{"date":"2026-01-28","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo","time":"8pm - 10pm","p":[{"n":"Ninad","l":1,"f":50},{"n":"Vivek"},{"n":"Rahul"},{"n":"Keshav"},{"n":"Ichha"},{"n":"Vivi"},{"n":"Megha"},{"n":"Vineet"},{"n":"Asad"},{"n":"Vamsi"},{"n":"Arya"},{"n":"Akhil"},{"n":"Laya"},{"n":"Mandar","l":1,"f":50},{"n":"Sampath"},{"n":"Kush"},{"n":"Vishnu"},{"n":"Sohail"}],"d":[],"total":6090,"perHead":333},{"date":"2026-02-04","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo","time":"8pm - 9.30pm","p":[{"n":"Ichha","l":1,"f":50},{"n":"Sampath"},{"n":"Mandar","l":1,"f":50},{"n":"Rahul"},{"n":"Saif","l":1,"f":50},{"n":"Kush"},{"n":"Vivi"},{"n":"Vishaal"},{"n":"Vineet"},{"n":"Kaushik"},{"n":"Yassar"},{"n":"Sohail"}],"d":[],"total":4530,"perHead":365},{"date":"2026-02-18","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo","time":"8pm - 10pm","p":[{"n":"Laya","f":50},{"n":"Sampath"},{"n":"Vishnu"},{"n":"Kushal"},{"n":"Vishaal"},{"n":"Vineet"},{"n":"Kriti"},{"n":"Anush"},{"n":"Mandar"},{"n":"Rahul"},{"n":"Asad"},{"n":"Kaushik"},{"n":"Kriti","g":1},{"n":"Kriti","g":2},{"n":"Kriti","g":3},{"n":"Kriti","g":4},{"n":"Kriti","g":5},{"n":"Kriti","g":6}],"d":[],"total":6000,"perHead":330},{"date":"2026-03-11","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo - BOOKED","time":"8pm - 10pm","p":[{"n":"Vineet"},{"n":"Asad"},{"n":"Kriti"},{"n":"Vishnu"},{"n":"Keshav"},{"n":"Rahul"},{"n":"Megha"},{"n":"Vamsi"},{"n":"Srav"},{"n":"Vivek"},{"n":"Kriti","g":1},{"n":"Sampath"},{"n":"Ayushi"},{"n":"Sid"},{"n":"Ichha","l":1,"f":50},{"n":"Asad","g":1},{"n":"Asad","g":2}],"d":[]},{"date":"2026-03-25","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo (Slot Blocked)","time":"8pm - 10pm","p":[{"n":"Kush"},{"n":"Nachiketh"},{"n":"Ichha","l":1,"f":50},{"n":"Neha Shetty"},{"n":"Sohail"},{"n":"Vivi"},{"n":"Vishaal"},{"n":"Yassar"},{"n":"Rahul"},{"n":"Rahul","g":1},{"n":"Vishnu"},{"n":"Sampath","g":1},{"n":"Mandar"},{"n":"Kaushik"}],"d":[{"n":"Srav","f":100},{"n":"Sampath","f":100}],"total":6100,"perHead":325},{"date":"2026-04-01","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo (blocked)","time":"8pm - 930pm","p":[{"n":"Kush"},{"n":"Rahul"},{"n":"Sampath"},{"n":"Vishnu"},{"n":"Sohail"},{"n":"Mandar"},{"n":"Kaushik","l":1,"f":50},{"n":"Asad"},{"n":"Saif"},{"n":"Salaudin"},{"n":"Teja"},{"n":"Fahad"},{"n":"Irfan"},{"n":"Yusuf"},{"n":"Anushree"},{"n":"Laya","l":1,"f":50}],"d":[{"n":"Ichha","f":100}],"total":4570,"perHead":257},{"date":"2026-04-15","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo (Blocked)","time":"8pm - 10pm","p":[{"n":"Vivek","l":1,"f":50},{"n":"Anush"},{"n":"Vishaal"},{"n":"Megha","l":1,"f":50},{"n":"Sumanth","l":1,"f":50},{"n":"Saif"},{"n":"Vineet"},{"n":"Kriti"},{"n":"Rahul"},{"n":"Kush"},{"n":"Asad"},{"n":"Vishnu","l":1,"f":50},{"n":"Sohail"},{"n":"Ichha"},{"n":"Mandar"},{"n":"Sampath","l":1,"f":50}],"d":[],"total":6400,"perHead":338},{"date":"2026-04-19","yr":"2026","wd":"Sun","grp":"w","loc":"Turfside (Booked)","time":"6am - 730am","p":[{"n":"Rahul","f":50},{"n":"Vineet"},{"n":"Vivek","f":50},{"n":"Neha","f":50},{"n":"Trina","f":50},{"n":"Srav"},{"n":"Nachiketh","f":50},{"n":"Sohail","f":50},{"n":"Vishnu"},{"n":"Sampath"},{"n":"Ichha","f":50},{"n":"Laya","f":50},{"n":"Sampath","g":1}],"d":[{"n":"Sreeniza","f":100}],"total":3918,"perHead":244},{"date":"2026-04-22","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo","time":"8pm - 10pm","p":[{"n":"Sampath"},{"n":"Kush"},{"n":"Jaideep"},{"n":"Fahad"},{"n":"Jason"},{"n":"Anush"},{"n":"Ichha"},{"n":"Sohail"},{"n":"Vishnu"},{"n":"Asad","l":1,"f":50},{"n":"Vineet"},{"n":"Kriti"},{"n":"Rahul"},{"n":"Srav","l":1,"f":50},{"n":"Vivek"},{"n":"Abhilash"}],"d":[],"total":6270,"perHead":334},{"date":"2026-04-29","yr":"2026","wd":"Wed","grp":"m","loc":"Olympians Arena","time":"7.45pm - 10pm","p":[{"n":"Laya"},{"n":"Jason"},{"n":"Ninad"},{"n":"Vivi"},{"n":"Rahul","g":1},{"n":"Akhil"},{"n":"Ichha"},{"n":"Saif"},{"n":"Vineet"},{"n":"Sohail"},{"n":"Kaushik","g":1},{"n":"Hemanth"},{"n":"Srav"},{"n":"Kewal"},{"n":"Kaushik"},{"n":"Saif","g":1},{"n":"Rutvik"},{"n":"Krishna"},{"n":"Anush"},{"n":"Asad"},{"n":"Rahul"},{"n":"Garima"},{"n":"Janani"},{"n":"Jagmeet"}],"d":[],"total":7880,"perHead":328},{"date":"2026-05-06","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo","time":"8pm - 10pm","p":[{"n":"Sampath"},{"n":"Anush"},{"n":"Megha"},{"n":"Rahul"},{"n":"Irfan"},{"n":"Sijal"},{"n":"Laya","f":50},{"n":"Srav"},{"n":"Vishnu"},{"n":"Sohail"},{"n":"Asad"},{"n":"Saif"},{"n":"Jason"},{"n":"Vineet"},{"n":"Ichha"},{"n":"Vivek"},{"n":"Ruth"},{"n":"Aayush"}],"d":[],"total":6370,"perHead":351},{"date":"2026-05-08","yr":"2026","wd":"Fri","grp":"m","loc":"Turfside, Jubilee Hills - BOOKED","time":"8 PM - 9 PM","p":[{"n":"Laya"},{"n":"Srav"},{"n":"Ichha"},{"n":"Trina"},{"n":"Pratyusha"},{"n":"Sohail"},{"n":"Asad"},{"n":"Jaideep"},{"n":"Rutvik"},{"n":"Jason"},{"n":"Saif"},{"n":"Irfan"}],"d":[],"total":3000,"perHead":250},{"date":"2026-05-13","yr":"2026","wd":"Wed","grp":"m","loc":"Olympians Arena, Apollo","time":"8pm - 10pm","p":[{"n":"Vishnu","g":1,"gn":"Arun"},{"n":"Sravani"},{"n":"Asad"},{"n":"Sohail"},{"n":"Kaushik"},{"n":"Vivek"},{"n":"Megha"},{"n":"Rahul"},{"n":"Sampath"},{"n":"Vishnu"},{"n":"Jaideep"},{"n":"Sid"},{"n":"Laya"},{"n":"Vineet"},{"n":"Rutvik"},{"n":"Jason"},{"n":"Mandar"},{"n":"Garima"},{"n":"Kewal"}],"d":[],"total":6380,"perHead":335},{"date":"2026-05-17","yr":"2026","wd":"Sun","grp":"w","loc":"Apollo","time":"630 AM - 8Am","p":[{"n":"Laya"},{"n":"Garima"},{"n":"Trina"},{"n":"Palak"},{"n":"Asad"},{"n":"Rahul"},{"n":"Kewal"},{"n":"Vivi"},{"n":"Sid"},{"n":"Kriti"},{"n":"Abhilash"}],"d":[],"total":3000,"perHead":250},{"date":"2026-05-20","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo","time":"8pm - 930pm","p":[{"n":"Laya","f":50},{"n":"Rahul","f":50},{"n":"Sohail"},{"n":"Irfan","f":50},{"n":"Jason"},{"n":"Jaideep"},{"n":"Garima"},{"n":"Kewal","f":50},{"n":"Abhilash"},{"n":"Rutvik"},{"n":"Vineet"},{"n":"Saif","f":50},{"n":"Asad"}],"d":[{"n":"Ichha","f":100}],"total":4650,"perHead":307},{"date":"2026-05-22","yr":"2026","wd":"Fri","grp":"w","loc":"TBD","time":"8 PM - 9 PM","p":[{"n":"Laya"},{"n":"Trina"},{"n":"Srav"},{"n":"Pratyusha"},{"n":"Sreeniza"},{"n":"Jaideep"},{"n":"Jason"},{"n":"Asad"}],"d":[],"total":3100,"perHead":258},{"date":"2026-05-27","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo","time":"8pm - 10pm","p":[{"n":"Laya"},{"n":"Ayushi"},{"n":"Disha"},{"n":"Kewel"},{"n":"Jason"},{"n":"Sohail"},{"n":"Rohit"},{"n":"Garima"},{"n":"Ichha"},{"n":"Srav"},{"n":"Abhilash"},{"n":"Sijal"},{"n":"Rahul"},{"n":"Asad"}],"d":[],"total":4750,"perHead":339},{"date":"2026-05-29","yr":"2026","wd":"Fri","grp":"w","loc":"Turfside","time":"8 PM - 9 PM","p":[{"n":"Sreeniza"},{"n":"Garima"},{"n":"Laya"},{"n":"Trina"},{"n":"Kewal"},{"n":"Asad"},{"n":"Rahul"},{"n":"Sohail"},{"n":"Sreeniza","g":1}],"d":[]},{"date":"2026-06-03","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo","time":"8pm - 10pm","p":[{"n":"Laya"},{"n":"Disha"},{"n":"Kewel"},{"n":"Jaideep"},{"n":"Kushal"},{"n":"Sohail"},{"n":"Garima"},{"n":"Srav"},{"n":"Irfan"},{"n":"Vamsi"},{"n":"Vineet"},{"n":"Rahul"},{"n":"Megha"},{"n":"Ichha"},{"n":"Saif"},{"n":"Mandar"},{"n":"Asad"},{"n":"Pranney"}],"d":[],"total":1760,"perHead":105},{"date":"2026-06-07","yr":"2026","wd":"Sun","grp":"w","loc":"Apollo","time":"630am - 830am","p":[{"n":"Laya"},{"n":"Ichha"},{"n":"Pratyusha"},{"n":"Asad"},{"n":"Rahul"},{"n":"Vivi"},{"n":"Garima"},{"n":"Disha"},{"n":"Jaideep"},{"n":"Vineet"},{"n":"Pranney"},{"n":"Ninad"},{"n":"Srav"},{"n":"Sampath"},{"n":"Sid"},{"n":"Sohail"},{"n":"Jason"}],"d":[{"n":"Megha","f":100}]},{"date":"2026-06-10","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo","time":"8pm - 930pm","p":[{"n":"Garima"},{"n":"Bhavya"},{"n":"Irfan"},{"n":"Kewal"},{"n":"Jason"},{"n":"Asad"},{"n":"Ali"},{"n":"Supriya"},{"n":"Saif"},{"n":"Kush"},{"n":"Sijal"},{"n":"Sohail"}],"d":[{"n":"Ichha","f":100}]},{"date":"2026-06-14","yr":"2026","wd":"Sun","grp":"w","loc":"Apollo","time":"7am - 830am","p":[{"n":"Pratyusha"},{"n":"Ansuman"},{"n":"Vishnu"},{"n":"Sid"},{"n":"Sohail"},{"n":"Megha"},{"n":"Garima"},{"n":"Kewal"},{"n":"Sampath"},{"n":"Vineet"},{"n":"Asad"}],"d":[{"n":"Ichha","f":100}],"total":4890,"perHead":368},{"date":"2026-06-17","yr":"2026","wd":"Wed","grp":"m","loc":"Turfside","time":"7.30pm - 9.30pm","p":[{"n":"Sohail","l":1,"f":50},{"n":"Sijal"},{"n":"Irfan","l":1,"f":50},{"n":"Vamsi","l":1,"f":50},{"n":"Kushal"},{"n":"Ichha","l":1,"f":50},{"n":"Garima"},{"n":"Jason"},{"n":"Sampath"},{"n":"Saif","l":1,"f":50},{"n":"Vishaal"},{"n":"Pranney","l":1,"f":50},{"n":"Srav"},{"n":"Vineet"},{"n":"Asad"},{"n":"Vivek","l":1,"f":50},{"n":"Kewal"},{"n":"Vishnu"}],"d":[],"total":7200,"perHead":361},{"date":"2026-06-19","yr":"2026","wd":"Fri","grp":"w","loc":"Apollo","time":"8pm - 9.30pm","p":[{"n":"Srav"},{"n":"Kush"},{"n":"Vineet"},{"n":"Asad"},{"n":"Sijal"},{"n":"Pratyusha"},{"n":"Asad","g":1,"gn":"Lajawanti"},{"n":"Asad","g":2,"gn":"Sujeet"}],"d":[],"total":3210,"perHead":223},{"date":"2026-06-21","yr":"2026","wd":"Sun","grp":"w","loc":"Apollo","time":"7am - 830am","p":[{"n":"Disha"},{"n":"Sijal"},{"n":"Aniketh"},{"n":"Vishnu"},{"n":"Asad"},{"n":"Ichha"},{"n":"Trina"},{"n":"Jason"},{"n":"Pranney"},{"n":"Sampath"},{"n":"Sohail"}],"d":[],"total":4670,"perHead":389},{"date":"2026-06-26","yr":"2026","wd":"Fri","grp":"m","loc":"Turfside","time":"8pm - 930pm","p":[{"n":"Kush"},{"n":"Sijal"},{"n":"Disha"},{"n":"Garima"},{"n":"Rija"},{"n":"Pranney"},{"n":"Saif"},{"n":"Asad"},{"n":"Ichha","f":50},{"n":"Sushma"},{"n":"Pratyusha"},{"n":"Sohail"}],"d":[],"total":3544,"perHead":292},{"date":"2026-07-01","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo - Booked","time":"8pm - 10pm","p":[{"n":"Laya","f":50},{"n":"Ichha","f":50},{"n":"Saif","f":50},{"n":"Vivek"},{"n":"Vineet"},{"n":"Sohail"},{"n":"Hasnain"},{"n":"Disha","f":50},{"n":"Shardul"},{"n":"Akhil","f":50},{"n":"Sijal"},{"n":"Mandar"},{"n":"Megha","f":50},{"n":"Kush"},{"n":"Vamsi","f":50},{"n":"Jason"},{"n":"Asad"},{"n":"Vivi"}],"d":[],"total":6270,"perHead":328},{"date":"2026-07-05","yr":"2026","wd":"Sun","grp":"w","loc":"Apollo","time":"630am - 8am","p":[{"n":"Ichha"},{"n":"Trina","f":50},{"n":"Sohail"},{"n":"Sid"},{"n":"Sijal"},{"n":"Jagmeet"},{"n":"Laya"},{"n":"Ayushi"},{"n":"Pratyusha"},{"n":"Asad"},{"n":"Jason"},{"n":"Subhankar"}],"d":[],"total":3040,"perHead":249},{"date":"2026-07-08","yr":"2026","wd":"Wed","grp":"m","loc":"Apollo <confirmed>","time":"8pm - 930pm","p":[{"n":"Ichha"},{"n":"Laya","f":50},{"n":"Kaushik"},{"n":"Mandar"},{"n":"Saif"},{"n":"Sohail"},{"n":"Uppala"},{"n":"Disha"},{"n":"Ayushi"},{"n":"Sijal"},{"n":"Asad"},{"n":"Kush"},{"n":"Rehan"},{"n":"Sadak"}],"d":[],"total":4615,"perHead":326}]</script>
+<script>
+// Live data model:
+//  - HISTORICAL_MATCHES: loaded from historical.json (the frozen archive built from the WhatsApp
+//    chat exports). Falls back to the embedded snapshot below if it can't be fetched.
+//  - PUBLISHED_NEW_MATCHES: every match anyone has published since then, loaded by auto-discovering
+//    and merging every file in the repo's matches/ folder (each one is a small timestamped batch —
+//    see downloadPendingMatches below).
+//  - PENDING_MATCHES: matches added via the "+ Add Match" tab in *this* browser session that haven't
+//    been downloaded/published yet.
+//  - MATCHES is always the three combined.
+// If you're hosting this on a custom domain (not username.github.io), set GITHUB_REPO below to
+// "owner/repo" so match-file discovery still works — otherwise it's auto-detected from the hostname.
+const GITHUB_REPO = '';
+
+const EMBEDDED_FALLBACK = JSON.parse(document.getElementById('embedded-fallback').textContent);
+let HISTORICAL_MATCHES = [];
+let PUBLISHED_NEW_MATCHES = [];
+let PENDING_MATCHES = [];
+let MATCHES = [];
+let dataSource = 'loading';
+let state = { view: 'matches', grp: 'all', year: '2026', ground: 'all', search: '', playerFilter: null, sort: 'desc', unsaved: false };
+
+async function fetchJsonSafe(url, fallback){
+  try {
+    const r = await fetch(url, {cache: 'no-store'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return await r.json();
+  } catch(e){
+    console.warn('Could not load '+url+' — using fallback.', e);
+    return fallback;
+  }
+}
+
+function detectGithubRepo(){
+  if(GITHUB_REPO) return GITHUB_REPO.split('/');
+  const host = (typeof location !== 'undefined' && location.hostname) || '';
+  const m = host.match(/^([^.]+)\.github\.io$/i);
+  if(!m) return null;
+  const owner = m[1];
+  const parts = location.pathname.split('/').filter(Boolean);
+  const repo = parts.length ? parts[0] : `${owner}.github.io`;
+  return [owner, repo];
+}
+
+async function discoverMatchFileUrls(){
+  const info = detectGithubRepo();
+  if(!info) return [];
+  const [owner, repo] = info;
+  try {
+    const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/matches`, {cache: 'no-store'});
+    if(!r.ok) return []; // e.g. 404 before the matches/ folder exists yet — that's fine
+    const list = await r.json();
+    if(!Array.isArray(list)) return [];
+    return list.filter(f=>f.type==='file' && f.name.toLowerCase().endsWith('.json')).map(f=>f.download_url);
+  } catch(e){
+    console.warn('Could not list matches/ folder via GitHub API.', e);
+    return [];
+  }
+}
+
+function recomputeMatches(){
+  MATCHES = HISTORICAL_MATCHES.concat(PUBLISHED_NEW_MATCHES).concat(PENDING_MATCHES);
+}
+
+async function loadData(){
+  const h = await fetchJsonSafe('historical.json', null);
+  if(h === null){
+    HISTORICAL_MATCHES = EMBEDDED_FALLBACK;
+    dataSource = 'offline';
+  } else {
+    HISTORICAL_MATCHES = h;
+    dataSource = 'live';
+  }
+
+  const fileUrls = await discoverMatchFileUrls();
+  const chunks = await Promise.all(fileUrls.map(u=>fetchJsonSafe(u, [])));
+  PUBLISHED_NEW_MATCHES = chunks.flat();
+  PENDING_MATCHES = [];
+  recomputeMatches();
+  render();
+}
+
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function normalizeGround(loc){
+  if(!loc) return 'Unknown';
+  let g = loc.split(',')[0];
+  g = g.replace(/[\(<][^)>]*[\)>]/g, '');
+  g = g.split(' - ')[0];
+  g = g.trim();
+  if(!g) return 'Unknown';
+  if(/olympian/i.test(g)) g = 'Apollo';
+  return g;
+}
+function grounds(){
+  return [...new Set(MATCHES.map(m=>normalizeGround(m.loc)))]
+    .filter(g=>g!=='TBD' && g!=='Unknown')
+    .sort();
+}
+const ESTIMATED_TOTAL = 4500;
+function isEstimated(m){
+  return !m.total;
+}
+function matchTotal(m){
+  return m.total || ESTIMATED_TOTAL;
+}
+function matchPerHead(m){
+  if(m.perHead) return m.perHead;
+  return m.p.length ? Math.round(ESTIMATED_TOTAL / m.p.length) : ESTIMATED_TOTAL;
+}
+
+function fmtDate(iso){
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+}
+
+function playerCounts(){
+  const m = new Map();
+  for(const match of scopedByYearGroup()){
+    for(const p of match.p){
+      m.set(p.n, (m.get(p.n)||0)+1);
+    }
+  }
+  return [...m.entries()].sort((a,b)=>b[1]-a[1]);
+}
+
+function renderAnalytics(){
+  let list = scopedByYearGroup();
+  if(state.ground!=='all') list = list.filter(m=>normalizeGround(m.loc)===state.ground);
+
+  const totalSpent = list.reduce((s,m)=>s+matchTotal(m),0);
+  const byYear = new Map();
+  list.forEach(m=>byYear.set(m.yr, (byYear.get(m.yr)||0)+matchTotal(m)));
+  const estimatedCount = list.filter(isEstimated).length;
+
+  // Per-player spend: each player who played a game pays that game's Per Head amount
+  // (or an estimated per-head share of the ₹4500 assumed total, for games with no figure in chat).
+  const spend = new Map(), pays = new Map();
+  list.forEach(m=>{
+    const ph = matchPerHead(m);
+    m.p.forEach(p=>{ spend.set(p.n,(spend.get(p.n)||0)+ph); pays.set(p.n,(pays.get(p.n)||0)+1); });
+  });
+  const spendArr = [...spend.entries()].sort((a,b)=>b[1]-a[1]);
+  const gamesWithPayments = list.slice().sort((a,b)=>b.date.localeCompare(a.date));
+
+  // Months with most games
+  const byMonth = new Map();
+  list.forEach(m=>{
+    const key = m.date.slice(0,7); // YYYY-MM
+    byMonth.set(key, (byMonth.get(key)||0)+1);
+  });
+  const monthArr = [...byMonth.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+  const monthMax = monthArr.length ? Math.max(...monthArr.map(x=>x[1])) : 1;
+
+  // Total spent, year wise (bar chart version of byYear)
+  const yearArr = [...byYear.entries()].sort((a,b)=>a[0].localeCompare(b[0]));
+  const yearMax = yearArr.length ? Math.max(...yearArr.map(x=>x[1])) : 1;
+
+  // Total spend per player, for the players who came to the most games
+  const avgArr = spendArr.map(([n,amt])=>[n, amt, pays.get(n)]).sort((a,b)=>b[2]-a[2]).slice(0,10);
+  const avgMax = avgArr.length ? Math.max(...avgArr.map(x=>x[1])) : 1;
+
+  // Location of games
+  const byLoc = new Map();
+  list.forEach(m=>{ const g = normalizeGround(m.loc); byLoc.set(g, (byLoc.get(g)||0)+1); });
+  const locArr = [...byLoc.entries()].sort((a,b)=>b[1]-a[1]);
+  const locMax = locArr.length ? Math.max(...locArr.map(x=>x[1])) : 1;
+
+  return `
+    <div class="stat-row">
+      <div class="stat"><div class="n">₹${totalSpent}</div><div class="l">Total spent</div></div>
+      ${[...byYear.keys()].sort().map(y=>`<div class="stat"><div class="n">₹${byYear.get(y)}</div><div class="l">${esc(y)}</div></div>`).join('')}
+    </div>
+
+    <h3 style="margin:22px 2px 10px;font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Months with most games</h3>
+    <div class="player-table">${monthArr.length ? monthArr.map(([key,c])=>{
+      const [y,mo] = key.split('-');
+      const label = `${MONTH_NAMES[parseInt(mo,10)-1]} ${y}`;
+      return `<div class="row"><div class="name" style="flex:1.4;">${esc(label)}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(c/monthMax*100)}%"></div></div><div class="cnt">${c}</div></div>`;
+    }).join('') : '<div class="empty">No games in this scope.</div>'}</div>
+
+    <h3 style="margin:26px 2px 10px;font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Total spent, year wise</h3>
+    <div class="player-table">${yearArr.length ? yearArr.map(([y,amt])=>{
+      return `<div class="row"><div class="name" style="flex:1.4;">${esc(y)}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(amt/yearMax*100)}%"></div></div><div class="cnt" style="width:auto;">₹${amt}</div></div>`;
+    }).join('') : '<div class="empty">No payments recorded.</div>'}</div>
+
+    <h3 style="margin:26px 2px 10px;font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Total spend per player — most frequent players</h3>
+    <div class="player-table">${avgArr.length ? avgArr.map(([n,amt,c])=>{
+      return `<div class="row"><div class="name" style="flex:1.4;">${esc(n)} <span style="color:var(--dim);">(${c} game${c===1?'':'s'})</span></div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(amt/avgMax*100)}%"></div></div><div class="cnt" style="width:auto;">₹${amt}</div></div>`;
+    }).join('') : '<div class="empty">No payments recorded.</div>'}</div>
+
+    <h3 style="margin:26px 2px 10px;font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Location of games</h3>
+    <div class="player-table">${locArr.length ? locArr.map(([g,c])=>{
+      return `<div class="row"><div class="name" style="flex:1.4;">${esc(g)}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(c/locMax*100)}%"></div></div><div class="cnt">${c}</div></div>`;
+    }).join('') : '<div class="empty">No games in this scope.</div>'}</div>
+
+    <h3 style="margin:26px 2px 10px;font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Per-game totals</h3>
+    ${gamesWithPayments.length ? gamesWithPayments.map(m=>{
+      const est = isEstimated(m);
+      return `
+      <div class="match-card" style="${est?'opacity:0.75;border-style:dashed;':''}">
+        <div class="match-top">
+          <div class="match-date">${fmtDate(m.date)}<span class="wd">${m.wd}</span></div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <span class="badge ${m.grp}">${m.grp==='m'?'Midweek':'Weekend'}</span>
+            ${est ? '<span class="tag ns">estimated</span>' : ''}
+            <span class="count-pill" style="font-weight:700;color:var(--gold);">₹${matchTotal(m)} <span style="color:var(--dim);font-weight:400;">(₹${matchPerHead(m)}/head)</span></span>
+          </div>
+        </div>
+        <div class="match-meta">${esc(normalizeGround(m.loc))}</div>
+      </div>
+    `;}).join('') : '<div class="empty">No payments recorded in this scope.</div>'}
+    ${estimatedCount>0 ? `<div class="empty" style="padding:10px 0;">${estimatedCount} game${estimatedCount===1?'':'s'} in this scope had no Total/Per Head posted in chat — assumed ₹${ESTIMATED_TOTAL} (marked "estimated" above).</div>` : ''}
+  `;
+}
+
+function renderAddMatch(){
+  const today = new Date().toISOString().slice(0,10);
+  return `
+    <div class="match-card" style="max-width:640px;">
+      <h3 style="margin:0 0 4px;font-size:16px;">Add a match</h3>
+      <div class="match-meta" style="margin-bottom:18px;">Fill this in right after a game and click Add. It'll show up here immediately — download the match file and upload it into the matches/ folder on GitHub to publish it for the group.</div>
+
+      <div class="form-group">
+        <label>Paste the WhatsApp roster message (optional — auto-fills everything below)</label>
+        <textarea class="form-input" id="add-paste" style="min-height:150px;" placeholder="📅 Day and Date: Sunday, 5th July
+⏰️ Time: 630am - 8am
+📍Location: Apollo
+Total : ₹3040
+Per Head: ₹249
+Team A
+1. Ichha ✅️
+2. Trina <+50>
+..."></textarea>
+        <div style="margin-top:8px;"><button class="btn-secondary" type="button" id="add-parse-btn">✨ Parse message</button></div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date</label>
+          <input class="form-input" type="date" id="add-date" value="${esc(today)}">
+        </div>
+        <div class="form-group">
+          <label>Group</label>
+          <select class="form-select" id="add-grp">
+            <option value="m">Midweek</option>
+            <option value="w">Weekend</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Location</label>
+          <input class="form-input" type="text" id="add-loc" placeholder="e.g. Apollo">
+        </div>
+        <div class="form-group">
+          <label>Time (optional)</label>
+          <input class="form-input" type="text" id="add-time" placeholder="e.g. 8pm - 10pm">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Players who played (one per line — add a * at the end for a late fee)</label>
+        <textarea class="form-input" id="add-players" placeholder="Sohail
+Asad
+Laya *"></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>Dropouts (optional, one per line — "Name" or "Name:fee", defaults to ₹100)</label>
+        <textarea class="form-input" id="add-dropouts" placeholder="Ichha" style="min-height:60px;"></textarea>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Total ₹ (optional — leave blank if not posted yet)</label>
+          <input class="form-input" type="number" id="add-total" placeholder="e.g. 4500">
+        </div>
+        <div class="form-group">
+          <label>Per Head ₹ (optional — auto-calculated from Total if blank)</label>
+          <input class="form-input" type="number" id="add-perhead" placeholder="e.g. 350">
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap;">
+        <button class="btn-primary" id="add-save-btn">Add match</button>
+        <button class="btn-secondary" id="add-download-btn">⬇ Download match file</button>
+      </div>
+      <div class="form-hint" style="margin-top:14px;">Each download is a small new file named like matches-20260719-143005.json, containing just what you've added since your last download. Upload it into the matches/ folder in your GitHub repo (as a new file, don't replace anything) — the dashboard automatically discovers and merges every file in that folder, so the group sees it once Pages redeploys (usually under a minute).</div>
+    </div>
+  `;
+}
+
+const MONTH_LOOKUP = {jan:0,january:0,feb:1,february:1,mar:2,march:2,apr:3,april:3,may:4,jun:5,june:5,jul:6,july:6,aug:7,august:7,sep:8,sept:8,september:8,oct:9,october:9,nov:10,november:10,dec:11,december:11};
+
+// Parses a pasted WhatsApp roster message (the kind posted after every game — "Day and Date:",
+// "Time:", "Location:", "Total:", "Per Head:", then numbered Team A / Team B lists with ✅/✔/☑
+// checkmarks, <+50> late-fee tags, and <100>/<+100> drop-out tags) into structured fields.
+function parseWhatsAppRoster(text){
+  const result = { date: null, time: null, loc: null, total: null, perHead: null, players: [], dropouts: [] };
+  const clean = text.replace(/[​⁠﻿]/g, ''); // strip invisible word-joiner/zero-width chars
+
+  let m = clean.match(/location\s*:?\s*([^\n]+)/i);
+  if(m) result.loc = m[1].trim();
+
+  m = clean.match(/time\s*:?\s*([^\n]+)/i);
+  if(m) result.time = m[1].trim();
+
+  m = clean.match(/(?:total|turf amount)\s*:?\s*₹?\s*(\d{2,6})/i);
+  if(m) result.total = parseInt(m[1],10);
+
+  m = clean.match(/per\s*head\s*:?\s*₹?\s*(\d{2,6})/i);
+  if(m) result.perHead = parseInt(m[1],10);
+
+  m = clean.match(/(?:day and date|date)\s*:?\s*([A-Za-z]+)?,?\s*(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)/i);
+  if(m){
+    const weekdayName = m[1];
+    const day = parseInt(m[2],10);
+    const monthIdx = MONTH_LOOKUP[m[3].toLowerCase()];
+    if(monthIdx !== undefined){
+      const now = new Date();
+      let best = null;
+      for(const yr of [now.getFullYear()-1, now.getFullYear(), now.getFullYear()+1]){
+        const cand = new Date(yr, monthIdx, day);
+        const wd = cand.toLocaleDateString('en-US', {weekday:'long'});
+        if(!weekdayName || wd.toLowerCase() === weekdayName.toLowerCase()){ best = cand; break; }
+      }
+      if(!best) best = new Date(now.getFullYear(), monthIdx, day);
+      const pad = n => String(n).padStart(2,'0');
+      result.date = `${best.getFullYear()}-${pad(best.getMonth()+1)}-${pad(best.getDate())}`;
+    }
+  }
+
+  const TICK_RE = /[✅✔☑]/;
+  const LATE_RE = /<\s*\+?\s*50\s*>|\(late\)/i;
+  const DROP_RE = /<\s*\+?\s*100\s*>|no\s*show/i;
+  for(const rawLine of clean.split('\n')){
+    const lm = rawLine.match(/^\s*\d+\.\s*(.+)$/);
+    if(!lm) continue;
+    const rest = lm[1].trim();
+    const isDrop = DROP_RE.test(rest);
+    const isLate = !isDrop && LATE_RE.test(rest);
+    let name = rest
+      .replace(/[✅✔☑]️?/g, '')
+      .replace(/<\s*\+?\s*\d+\s*>/g, '')
+      .replace(/\(late\)/ig, '')
+      .replace(/no\s*show/ig, '')
+      .trim();
+    if(!name) continue;
+    if(isDrop) result.dropouts.push(name);
+    else if(isLate) result.players.push(name + ' *');
+    else result.players.push(name);
+  }
+
+  return result;
+}
+
+function handleParsePaste(){
+  const text = document.getElementById('add-paste').value;
+  if(!text.trim()){ alert('Paste a WhatsApp roster message first.'); return; }
+  const r = parseWhatsAppRoster(text);
+  if(r.date) document.getElementById('add-date').value = r.date;
+  if(r.loc) document.getElementById('add-loc').value = r.loc;
+  if(r.time) document.getElementById('add-time').value = r.time;
+  if(r.total != null) document.getElementById('add-total').value = r.total;
+  if(r.perHead != null) document.getElementById('add-perhead').value = r.perHead;
+  if(r.players.length) document.getElementById('add-players').value = r.players.join('\n');
+  if(r.dropouts.length) document.getElementById('add-dropouts').value = r.dropouts.join('\n');
+
+  const missing = [];
+  if(!r.date) missing.push('date');
+  if(!r.players.length) missing.push('players');
+  if(missing.length) alert('Parsed what I could, but couldn\'t find: '+missing.join(', ')+'. Please fill those in manually.');
+  else alert('Parsed! Review the fields below, then click "Add match".');
+}
+
+function parsePlayersInput(text){
+  return text.split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{
+    const late = /\*\s*$/.test(line);
+    const name = line.replace(/\*\s*$/,'').trim();
+    const obj = {n: name};
+    if(late){ obj.l = 1; obj.f = 50; }
+    return obj;
+  });
+}
+
+function parseDropoutsInput(text){
+  return text.split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{
+    const m = line.match(/^(.+?)(?::\s*(\d+))?$/);
+    const name = m[1].trim();
+    const fee = m[2] ? parseInt(m[2],10) : 100;
+    return {n:name, f:fee};
+  });
+}
+
+function handleAddMatch(){
+  const date = document.getElementById('add-date').value;
+  if(!date){ alert('Please pick a date.'); return; }
+  const grp = document.getElementById('add-grp').value;
+  const loc = document.getElementById('add-loc').value.trim();
+  const time = document.getElementById('add-time').value.trim();
+  const playersText = document.getElementById('add-players').value;
+  const dropoutsText = document.getElementById('add-dropouts').value;
+  const totalVal = document.getElementById('add-total').value.trim();
+  const perHeadVal = document.getElementById('add-perhead').value.trim();
+
+  const p = parsePlayersInput(playersText);
+  if(!p.length){ alert('Add at least one player who played.'); return; }
+  const d = parseDropoutsInput(dropoutsText);
+
+  if(MATCHES.some(m=>m.date===date)){
+    if(!confirm('A match on this date already exists. Add another entry for the same date anyway?')) return;
+  }
+
+  const wd = new Date(date+'T00:00:00').toLocaleDateString('en-US', {weekday:'short'});
+  const yr = date.slice(0,4);
+
+  const match = { date, yr, wd, grp, loc: loc || 'TBD', time: time || null, p, d };
+  if(totalVal) match.total = parseInt(totalVal,10);
+  if(perHeadVal) match.perHead = parseInt(perHeadVal,10);
+  else if(totalVal) match.perHead = Math.round(parseInt(totalVal,10)/p.length);
+
+  PENDING_MATCHES.push(match);
+  recomputeMatches();
+  state.unsaved = true;
+  state.view = 'matches';
+  state.year = yr;
+  state.grp = 'all';
+  state.playerFilter = null;
+  render();
+}
+
+function timestampFilename(){
+  const d = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  return `matches-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.json`;
+}
+
+// Downloads only the matches added since the last download/publish (not the full history) — each
+// download is its own small timestamped file, so you upload it as a NEW file into the repo's
+// matches/ folder rather than replacing an existing one. The dashboard discovers and merges every
+// file in that folder automatically.
+function downloadPendingMatches(){
+  if(!PENDING_MATCHES.length){ alert('No new matches to publish yet — add one first.'); return; }
+  const filename = timestampFilename();
+  const json = JSON.stringify(PENDING_MATCHES, null, 2);
+  const blob = new Blob([json], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  PUBLISHED_NEW_MATCHES = PUBLISHED_NEW_MATCHES.concat(PENDING_MATCHES);
+  PENDING_MATCHES = [];
+  recomputeMatches();
+  state.unsaved = false;
+  render();
+}
+
+function years(){
+  return [...new Set(MATCHES.map(m=>m.yr))].sort();
+}
+
+function scopedByYearGroup(){
+  let list = MATCHES.slice();
+  if(state.grp!=='all') list = list.filter(m=>m.grp===state.grp);
+  if(state.year!=='all') list = list.filter(m=>m.yr===state.year);
+  return list;
+}
+
+function dropoutCounts(){
+  const m = new Map();
+  scopedByYearGroup().forEach(match=>(match.d||[]).forEach(d=>{ m.set(d.n, (m.get(d.n)||0)+1); }));
+  return m;
+}
+
+function filteredMatches(){
+  let list = MATCHES.slice();
+  if(state.grp!=='all') list = list.filter(m=>m.grp===state.grp);
+  if(state.year!=='all') list = list.filter(m=>m.yr===state.year);
+  if(state.playerFilter) list = list.filter(m=>m.p.some(p=>p.n===state.playerFilter));
+  if(state.search.trim()){
+    const q = state.search.trim().toLowerCase();
+    list = list.filter(m=>m.p.some(p=>p.n.toLowerCase().includes(q)) || (m.loc||'').toLowerCase().includes(q));
+  }
+  list.sort((a,b)=> state.sort==='desc' ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date));
+  return list;
+}
+
+function chipHTML(p){
+  let tags = '';
+  if(p.l) tags += '<span class="tag late">late</span>';
+  if(p.g) tags += `<span class="tag g">+${p.g}${p.gn?': '+esc(p.gn):''}</span>`;
+  return `<span class="chip" data-player="${esc(p.n)}">${esc(p.n)}${tags}</span>`;
+}
+
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+function matchCard(m){
+  const grpLabel = m.grp==='m' ? 'Midweek' : 'Weekend';
+  const meta = [m.loc, m.time].filter(Boolean).join(' · ');
+  return `<div class="match-card">
+    <div class="match-top">
+      <div><span class="match-date">${fmtDate(m.date)}<span class="wd">${m.wd}</span></span></div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="badge ${m.grp}">${grpLabel}</span>
+        <span class="count-pill">${m.p.length} players</span>
+      </div>
+    </div>
+    ${meta ? `<div class="match-meta">${esc(meta)}</div>` : ''}
+    <div class="chip-row">${m.p.map(chipHTML).join('')}</div>
+  </div>`;
+}
+
+function renderMatches(){
+  const list = filteredMatches();
+  if(!list.length) return '<div class="empty">No matches found.</div>';
+  return list.map(matchCard).join('');
+}
+
+function renderPlayers(){
+  const counts = playerCounts();
+  const dcounts = dropoutCounts();
+  const q = state.search.trim().toLowerCase();
+  const filtered = q ? counts.filter(([n])=>n.toLowerCase().includes(q)) : counts;
+  const max = counts.length ? counts[0][1] : 1;
+  if(!filtered.length) return '<div class="empty">No players found.</div>';
+  return `<div class="player-table">` + filtered.map(([n,c],i)=>{
+    const dc = dcounts.get(n);
+    return `<div class="row" data-player="${esc(n)}">
+      <div class="rank">${i+1}</div>
+      <div class="name">${esc(n)}${dc ? ` <span class="tag ns">dropped out ${dc}x</span>` : ''}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(c/max*100)}%"></div></div>
+      <div class="cnt">${c}</div>
+    </div>`;
+  }).join('') + `</div>`;
+}
+
+function render(){
+  const scoped = MATCHES.filter(m => (state.year==='all' || m.yr===state.year));
+  const totalMatches = scoped.length;
+  const totalPlayers = new Set(scoped.flatMap(m=>m.p.map(p=>p.n))).size;
+  const midweekCount = scoped.filter(m=>m.grp==='m').length;
+  const weekendCount = scoped.filter(m=>m.grp==='w').length;
+  const first = scoped[0] || MATCHES[0], last = scoped[scoped.length-1] || MATCHES[MATCHES.length-1];
+
+  let body = '';
+  if(state.playerFilter){
+    const count = MATCHES.filter(m=>m.p.some(p=>p.n===state.playerFilter)).length;
+    body += `<button class="back-btn" id="clear-player">← Clear filter</button>`;
+    body += `<div class="player-detail">Showing <b style="color:var(--text)">${esc(state.playerFilter)}</b>'s ${count} match${count===1?'':'es'}</div>`;
+  }
+
+  document.getElementById('app').innerHTML = `
+    <h1>⚽ Anyday Football — Match Archive</h1>
+    <div class="sub">Extracted from the Anyday Midweek &amp; Weekend Games WhatsApp chats · ${fmtDate(first.date)} – ${fmtDate(last.date)}</div>
+    ${state.unsaved ? `<div class="unsaved-banner">
+      <span>You've added match(es) not yet published to the group — download the file and upload it into the matches/ folder on GitHub.</span>
+      <button id="download-banner-btn">⬇ Download match file</button>
+    </div>` : ''}
+    ${dataSource === 'offline' ? `<div class="unsaved-banner" style="background:var(--panel2);color:var(--dim);border:1px solid var(--line);">
+      <span>Showing the offline snapshot — open this page via its hosted GitHub Pages URL to see live data from the group.</span>
+    </div>` : ''}
+    <div class="stat-row">
+      <div class="stat"><div class="n">${totalMatches}</div><div class="l">Matches played</div></div>
+      <div class="stat"><div class="n">${midweekCount}</div><div class="l">Midweek</div></div>
+      <div class="stat"><div class="n">${weekendCount}</div><div class="l">Weekend</div></div>
+      <div class="stat"><div class="n">${totalPlayers}</div><div class="l">Unique names</div></div>
+    </div>
+    <div class="controls">
+      <div class="tabs">
+        <button class="tab-btn ${state.view==='matches'?'active':''}" data-view="matches">Matches</button>
+        <button class="tab-btn ${state.view==='players'?'active':''}" data-view="players">Players</button>
+        <button class="tab-btn ${state.view==='analytics'?'active':''}" data-view="analytics">Analytics</button>
+        <button class="tab-btn ${state.view==='add'?'active':''}" data-view="add">+ Add Match</button>
+      </div>
+      ${state.view!=='add' ? `<div class="pill-group" id="grp-pills">
+        <button class="pill ${state.grp==='all'?'active':''}" data-grp="all">All</button>
+        <button class="pill ${state.grp==='m'?'active':''}" data-grp="m">Midweek</button>
+        <button class="pill ${state.grp==='w'?'active':''}" data-grp="w">Weekend</button>
+      </div>
+      <div class="pill-group" id="year-pills">
+        ${years().map(y=>`<button class="pill ${state.year===y?'active':''}" data-year="${y}">${y}</button>`).join('')}
+        <button class="pill ${state.year==='all'?'active':''}" data-year="all">All years</button>
+      </div>` : ''}
+      ${state.view==='analytics' ? `<div class="pill-group" id="ground-pills">
+        <button class="pill ${state.ground==='all'?'active':''}" data-ground="all">All grounds</button>
+        ${grounds().map(g=>`<button class="pill ${state.ground===g?'active':''}" data-ground="${esc(g)}">${esc(g)}</button>`).join('')}
+      </div>` : ''}
+      ${state.view!=='analytics' && state.view!=='add' ? `<input id="search" type="text" placeholder="Search player or location…" value="${esc(state.search)}">` : ''}
+    </div>
+    <div id="body">${body}</div>
+    <div class="view ${state.view==='matches'?'active':''}" id="matches-view">${state.view==='matches' ? renderMatches() : ''}</div>
+    <div class="view ${state.view==='players'?'active':''}" id="players-view">${state.view==='players' ? renderPlayers() : ''}</div>
+    <div class="view ${state.view==='analytics'?'active':''}" id="analytics-view">${state.view==='analytics' ? renderAnalytics() : ''}</div>
+    <div class="view ${state.view==='add'?'active':''}" id="add-view">${state.view==='add' ? renderAddMatch() : ''}</div>
+    <div class="note">
+      <b>How this was built:</b> parsed from every "Playlist" / team-roster message in both WhatsApp chat exports. For each match, the message with the most filled slots (12 full, or at least 5) was taken as the final roster, then grouped by inferred match date from the surrounding conversation.
+      <br><br>
+      <b>Known limitations:</b> a player only counts as having played if their name has an actual ✅/☑️ checkmark next to it in the final roster message — plain sign-up sheets with no confirmation ticks are not counted, even if a venue was proposed. This dropped sign-ups that never got confirmed (several were explicitly cancelled in the chat) and corrected several rosters where an earlier, unticked message had been used instead of the real final one. The match list was then cross-checked against a manually recalled list of 32 game days for 2026; 6 matches were added back in (2026-02-04, 2026-04-22, 2026-05-17, 2026-05-22, 2026-06-14, 2026-06-19) — two of these (05-17, 05-22) lacked a checkmarked roster but were confirmed by direct recollection and restored using the sign-up sheet instead. Names are shown as typed in WhatsApp with a few manual alias merges applied (e.g. "Soh" → "Sohail", "Ichha" / "Iccha" unified, "Vik" / "Viks" unified). Anyone flagged with a ₹100 fee was treated as a drop-out — excluded from that match's player list and shown as a "dropped out" tag on the Players tab. Payments are the actual "Total: ₹X" ground cost and "Per Head: ₹X" figures posted in chat for each game, not individual late/no-show fees; games that never had a Total posted are assumed to cost ₹4500 (split evenly per player) and marked "estimated" on the Analytics tab. Ground names are grouped by base venue (e.g. "Olympians Arena" counts as Apollo; TBD/unlisted venues are hidden from the filter).
+    </div>
+    <footer class="tag">${totalMatches} matches · generated from chat export</footer>
+  `;
+
+  const searchEl = document.getElementById('search');
+  if(searchEl) searchEl.addEventListener('input', e=>{ state.search = e.target.value; render(); });
+  document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click', ()=>{ state.view=b.dataset.view; render(); }));
+  document.querySelectorAll('#grp-pills .pill').forEach(b=>b.addEventListener('click', ()=>{ state.grp=b.dataset.grp; render(); }));
+  document.querySelectorAll('#year-pills .pill').forEach(b=>b.addEventListener('click', ()=>{ state.year=b.dataset.year; render(); }));
+  document.querySelectorAll('#ground-pills .pill').forEach(b=>b.addEventListener('click', ()=>{ state.ground=b.dataset.ground; render(); }));
+  document.querySelectorAll('[data-player]').forEach(el=>el.addEventListener('click', ()=>{
+    state.playerFilter = el.dataset.player; state.view='matches'; render();
+  }));
+  const clearBtn = document.getElementById('clear-player');
+  if(clearBtn) clearBtn.addEventListener('click', ()=>{ state.playerFilter=null; render(); });
+  const addSaveBtn = document.getElementById('add-save-btn');
+  if(addSaveBtn) addSaveBtn.addEventListener('click', handleAddMatch);
+  const addDownloadBtn = document.getElementById('add-download-btn');
+  if(addDownloadBtn) addDownloadBtn.addEventListener('click', downloadPendingMatches);
+  const bannerDownloadBtn = document.getElementById('download-banner-btn');
+  if(bannerDownloadBtn) bannerDownloadBtn.addEventListener('click', downloadPendingMatches);
+  const parseBtn = document.getElementById('add-parse-btn');
+  if(parseBtn) parseBtn.addEventListener('click', handleParsePaste);
+
+  // preserve focus/cursor in search box after re-render
+  const s = document.getElementById('search');
+  if(document.activeElement !== s && state.search){ /* no-op */ }
+}
+
+loadData();
+</script>
+</body>
+</html>
