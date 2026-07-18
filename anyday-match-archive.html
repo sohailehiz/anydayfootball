@@ -213,8 +213,10 @@ function fmtDate(iso){
 function playerCounts(){
   const m = new Map();
   for(const match of scopedByYearGroup()){
-    for(const p of match.p){
-      m.set(p.n, (m.get(p.n)||0)+1);
+    // De-dupe names within a match: guest slots reuse the inviter's name (n), so without this a
+    // player who brought guests would get extra games counted that aren't actually theirs.
+    for(const n of new Set(match.p.map(p=>p.n))){
+      m.set(n, (m.get(n)||0)+1);
     }
   }
   return [...m.entries()].sort((a,b)=>b[1]-a[1]);
@@ -234,7 +236,9 @@ function renderAnalytics(){
   const spend = new Map(), pays = new Map();
   list.forEach(m=>{
     const ph = matchPerHead(m);
-    m.p.forEach(p=>{ spend.set(p.n,(spend.get(p.n)||0)+ph); pays.set(p.n,(pays.get(p.n)||0)+1); });
+    // De-dupe names within a match (see playerCounts note above) so a guest slot logged under
+    // the inviter's name doesn't inflate that player's spend/games-played count.
+    new Set(m.p.map(p=>p.n)).forEach(n=>{ spend.set(n,(spend.get(n)||0)+ph); pays.set(n,(pays.get(n)||0)+1); });
   });
   const spendArr = [...spend.entries()].sort((a,b)=>b[1]-a[1]);
 
