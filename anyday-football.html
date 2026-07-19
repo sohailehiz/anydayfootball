@@ -101,6 +101,18 @@ input#search::placeholder{color:var(--chalk-dim);}
 .favorites-panel .sub{font-size:12px;color:var(--chalk-dim);margin-bottom:14px;}
 .favorites-panel .fav-label{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--chalk-dim);margin:12px 0 4px;}
 .favorites-panel .fav-label:first-of-type{margin-top:0;}
+.avatar-edit-row{display:flex;gap:12px;align-items:center;}
+.avatar-edit-preview{
+  width:56px;height:56px;border-radius:50%;overflow:hidden;flex:none;
+  background:var(--ink);border:2px solid rgba(255,255,255,0.25);
+}
+.avatar-edit-preview img{width:100%;height:100%;object-fit:cover;}
+.avatar-edit-controls{flex:1;min-width:0;}
+.favorites-panel input[type="file"]{
+  width:100%;background:rgba(0,0,0,0.25);border:1px solid var(--line);border-radius:8px;
+  padding:6px 8px;color:var(--chalk-dim);font-size:11.5px;font-family:'Inter',sans-serif;
+  margin-bottom:0;box-sizing:border-box;
+}
 .favorites-panel input{
   width:100%;background:rgba(0,0,0,0.25);border:1px solid var(--line);border-radius:8px;
   padding:8px 10px;color:var(--chalk);font-size:13px;font-family:'Inter',sans-serif;margin-bottom:6px;
@@ -406,10 +418,11 @@ async function fetchAllRatings(){
 // with live Supabase data, same as ratings.
 let FAVORITES_BY_NAME = new Map();
 
+// Despite the name, this also carries avatar_url — same player_profiles row, one fetch.
 async function fetchAllFavorites(){
   try {
     const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/player_profiles?select=name,favorite_club,favorite_players,favorite_nations`, { headers, cache: 'no-store' });
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/player_profiles?select=name,favorite_club,favorite_players,favorite_nations,avatar_url`, { headers, cache: 'no-store' });
     if(!r.ok) throw new Error('HTTP '+r.status);
     const rows = await r.json();
     const map = new Map();
@@ -417,7 +430,8 @@ async function fetchAllFavorites(){
       map.set(row.name, {
         club: row.favorite_club || null,
         players: row.favorite_players || [],
-        nations: row.favorite_nations || []
+        nations: row.favorite_nations || [],
+        avatarUrl: row.avatar_url || null
       });
     });
     return map;
@@ -560,6 +574,10 @@ function avgStatScaled(ratings, key){
 }
 
 function cardFrontHTML(s, overall, tier, stars, rank, ratings){
+  const fav = FAVORITES_BY_NAME.get(s.name);
+  const avatarInner = fav && fav.avatarUrl
+    ? `<img src="${escapeHtml(fav.avatarUrl)}" alt="${escapeHtml(s.name)}">`
+    : defaultAvatarSVG(s.name);
   return `
     <div class="card-face">
       <div class="fifa-card tier-${tier}">
@@ -570,7 +588,7 @@ function cardFrontHTML(s, overall, tier, stars, rank, ratings){
           </div>
           <div class="card-rank">#${rank}</div>
         </div>
-        <div class="card-avatar-wrap"><div class="card-avatar">${defaultAvatarSVG(s.name)}</div></div>
+        <div class="card-avatar-wrap"><div class="card-avatar">${avatarInner}</div></div>
         <div class="card-name">${escapeHtml(s.name)}</div>
         <div class="card-club-line">Anyday FC</div>
         <div class="card-stats">
@@ -695,17 +713,33 @@ function renderMyCard(){
   });
   const favBtn = document.getElementById('save-favorites-btn');
   if(favBtn) favBtn.addEventListener('click', handleSaveFavorites);
+  const avatarInput = document.getElementById('avatar-file-input');
+  if(avatarInput) avatarInput.addEventListener('change', handleAvatarUpload);
   wireNav();
 }
 
 function favoritesPanelHTML(name){
-  const fav = FAVORITES_BY_NAME.get(name) || { club: null, players: [], nations: [] };
+  const fav = FAVORITES_BY_NAME.get(name) || { club: null, players: [], nations: [], avatarUrl: null };
   const players = [fav.players?.[0]||'', fav.players?.[1]||'', fav.players?.[2]||''];
   const nations = [fav.nations?.[0]||'', fav.nations?.[1]||'', fav.nations?.[2]||''];
+  const avatarPreview = fav.avatarUrl
+    ? `<img src="${escapeHtml(fav.avatarUrl)}" alt="${escapeHtml(name)}">`
+    : defaultAvatarSVG(name);
   return `
     <div class="favorites-panel">
       <h2>Your favorites</h2>
       <div class="sub">Shown on the back of your card. Update these anytime — no limit on edits.</div>
+
+      <label class="fav-label">Profile photo</label>
+      <div class="avatar-edit-row">
+        <div class="avatar-edit-preview" id="avatar-preview">${avatarPreview}</div>
+        <div class="avatar-edit-controls">
+          <input id="avatar-file-input" type="file" accept="image/png,image/jpeg,image/webp">
+          <div class="sub" style="margin:4px 0 0;">JPG, PNG or WebP, up to 3MB.</div>
+          <div id="avatar-upload-status" class="fav-save-status"></div>
+        </div>
+      </div>
+
       <label class="fav-label">Favorite club</label>
       <input id="fav-club" type="text" value="${escapeHtml(fav.club || '')}" placeholder="e.g. Arsenal">
       <label class="fav-label">Top 3 players</label>
@@ -746,6 +780,55 @@ async function handleSaveFavorites(){
 
   FAVORITES_BY_NAME = await fetchAllFavorites();
   btn.disabled = false; btn.textContent = 'Save favorites';
+  status.textContent = 'Saved.';
+  setTimeout(render, 900);
+}
+
+const AVATAR_MAX_BYTES = 3 * 1024 * 1024;
+
+async function handleAvatarUpload(e){
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  const status = document.getElementById('avatar-upload-status');
+
+  if(!['image/png','image/jpeg','image/webp'].includes(file.type)){
+    status.textContent = 'Please choose a JPG, PNG, or WebP image.';
+    e.target.value = '';
+    return;
+  }
+  if(file.size > AVATAR_MAX_BYTES){
+    status.textContent = 'That image is too large — please pick one under 3MB.';
+    e.target.value = '';
+    return;
+  }
+
+  status.textContent = 'Uploading...';
+  const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+  // Fixed path per user (upsert: true replaces it in place) — keeps storage tidy and matches the
+  // "self insert/update avatars" RLS policy, which requires the first path segment to be the
+  // uploader's own auth user id.
+  const path = `${currentSession.user.id}/avatar.${ext}`;
+
+  const { error: uploadErr } = await sb.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type });
+  if(uploadErr){
+    status.textContent = `Upload failed: ${uploadErr.message}`;
+    e.target.value = '';
+    return;
+  }
+
+  const { data: pub } = sb.storage.from('avatars').getPublicUrl(path);
+  // Cache-bust so the new photo shows immediately instead of a stale cached copy at the same URL.
+  const avatarUrl = `${pub.publicUrl}?t=${Date.now()}`;
+
+  const { error: updateErr } = await sb.from('player_profiles')
+    .update({ avatar_url: avatarUrl })
+    .eq('id', currentSession.user.id);
+  if(updateErr){
+    status.textContent = `Photo uploaded but couldn't save it to your profile: ${updateErr.message}`;
+    return;
+  }
+
+  FAVORITES_BY_NAME = await fetchAllFavorites();
   status.textContent = 'Saved.';
   setTimeout(render, 900);
 }

@@ -71,8 +71,32 @@ create table if not exists player_profiles (
   -- Freely editable cosmetic preferences, capped at 3 each — no lock, unlike match_ratings.
   favorite_club text,
   favorite_players text[] check (favorite_players is null or cardinality(favorite_players) <= 3),
-  favorite_nations text[] check (favorite_nations is null or cardinality(favorite_nations) <= 3)
+  favorite_nations text[] check (favorite_nations is null or cardinality(favorite_nations) <= 3),
+  avatar_url text
 );
+
+-- Public "avatars" Storage bucket for profile pictures — a player can only write files under a
+-- folder named after their own user id (enforced below), but anyone can view any photo since
+-- cards are public. See migrate_avatar.sql for the equivalent if upgrading an existing project.
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+drop policy if exists "public read avatars" on storage.objects;
+create policy "public read avatars" on storage.objects
+  for select using (bucket_id = 'avatars');
+
+drop policy if exists "self insert avatars" on storage.objects;
+create policy "self insert avatars" on storage.objects
+  for insert with check (bucket_id = 'avatars' and auth.uid()::text = (storage.foldername(name))[1]);
+
+drop policy if exists "self update avatars" on storage.objects;
+create policy "self update avatars" on storage.objects
+  for update using (bucket_id = 'avatars' and auth.uid()::text = (storage.foldername(name))[1]);
+
+drop policy if exists "self delete avatars" on storage.objects;
+create policy "self delete avatars" on storage.objects
+  for delete using (bucket_id = 'avatars' and auth.uid()::text = (storage.foldername(name))[1]);
 
 -- Per-match self-ratings (self-rating only, never peer-rated). Four stats per match, each 1-10.
 -- "edited" tracks whether the player has already used their one allowed correction — see the RLS

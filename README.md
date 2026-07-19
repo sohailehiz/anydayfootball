@@ -71,6 +71,7 @@ If you already have a running project and are just picking up new schema changes
 - **`migrate_match_ratings.sql`** — adds the four-stat rating columns and the one-edit-lock policy.
 - **`migrate_profile_favorites.sql`** — adds `favorite_club`/`favorite_players`/`favorite_nations` to `player_profiles`.
 - **`migrate_stable_match_ids.sql`** — adds `source_key` to `matches` and a uniqueness constraint on it, so `seed.mjs` can upsert matches instead of wiping the table. Run this once if your project predates this fix (does not restore ratings already lost to a past reseed — only prevents future ones).
+- **`migrate_avatar.sql`** — adds `avatar_url` to `player_profiles` and sets up a public `avatars` Storage bucket with policies so a player can only upload/replace/delete their own photo.
 
 Other scripts in `supabase/`:
 
@@ -91,6 +92,10 @@ Ratings are self-only (no peer rating), and only offered for matches from 2026-0
 ## Player favorites
 
 Logged-in players can set a favorite club and up to 3 favorite players/nations from the panel next to their card on the "My Card" view. Unlike ratings, these are freely re-editable — no lock, no limit on how many times they can be updated. Shown on the back of the player's card.
+
+## Profile photo
+
+From the same panel, a player can upload a profile photo (JPG/PNG/WebP, up to 3MB) that replaces the generated initials avatar on the front of their card everywhere it appears — their own card and the public gallery. Photos are stored in a public Supabase Storage bucket (`avatars`), one file per player at a fixed path keyed by their own user id, so re-uploading always replaces rather than accumulates files. A player can only write to their own path — enforced by Storage RLS policies, not just the UI.
 
 ## Notes
 
