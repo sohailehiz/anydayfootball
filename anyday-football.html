@@ -174,6 +174,13 @@ footer.tag{text-align:center;color:var(--chalk-dim);font-size:11.5px;margin-top:
    planned but not built. For now this is a read-only public gallery. */
 const GITHUB_REPO = '';
 
+// Primary data source: Supabase (loaded via seed script from data/historical.json + data/matches/).
+// SUPABASE_ANON_KEY is the "publishable" key — safe to expose in client code by design; it can only
+// read what the RLS policies in supabase/schema.sql allow (public read-only on match data).
+// If Supabase can't be reached, everything below falls back to the static JSON files, unchanged.
+const SUPABASE_URL = 'https://nszzhghwhevxcybzprlk.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_jSgeli_BnshhZwxeBkwTEQ_ccDXobfS';
+
 // Player name merges (e.g. "Kush" and "Kushal" being the same person) are tracked as an auditable
 // record in data/player-aliases.json — every entry there is a merge that's been made, with a note
 // and date. Names are normalized to their canonical form the moment data loads, so this page and
@@ -234,7 +241,58 @@ function normalizeName(n){
   return ALIAS_MAP.get(n) || n;
 }
 
+// Reads matches + player_aliases straight from Supabase (via the public REST API, using the
+// publishable key) and reshapes them back into this app's usual {date,yr,wd,grp,loc,p:[],d:[]}
+// match objects, so every existing function downstream works unmodified regardless of which
+// data source is active. Returns null on any failure so loadData() can fall back to the JSON files.
+async function fetchFromSupabase(){
+  try {
+    const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
+    const [matchesRes, aliasesRes] = await Promise.all([
+      fetch(`${SUPABASE_URL}/rest/v1/matches?select=*,match_players(*),match_dropouts(*)&order=match_date.asc`, { headers, cache: 'no-store' }),
+      fetch(`${SUPABASE_URL}/rest/v1/player_aliases?select=*`, { headers, cache: 'no-store' })
+    ]);
+    if(!matchesRes.ok || !aliasesRes.ok) throw new Error(`Supabase HTTP ${matchesRes.status}/${aliasesRes.status}`);
+    const rawMatches = await matchesRes.json();
+    const rawAliases = await aliasesRes.json();
+    if(!Array.isArray(rawMatches) || !rawMatches.length) throw new Error('Empty Supabase matches response');
+
+    const matches = rawMatches.map(m=>{
+      const p = (m.match_players||[]).map(row=>{
+        const o = { n: row.raw_name };
+        if(row.is_guest) o.g = row.guest_number;
+        if(row.guest_name) o.gn = row.guest_name;
+        if(row.late_fee) o.l = 1;
+        if(row.fee_amount != null) o.f = row.fee_amount;
+        return o;
+      });
+      const d = (m.match_dropouts||[]).map(row=>{
+        const o = { n: row.raw_name };
+        if(row.fee_amount != null) o.f = row.fee_amount;
+        return o;
+      });
+      return { date: m.match_date, yr: m.yr, wd: m.wd, grp: m.grp, loc: m.loc, time: m.match_time, total: m.total, perHead: m.per_head, p, d };
+    });
+    const aliases = (rawAliases||[]).map(a=>({ alias: a.alias, canonical: a.canonical, note: a.note, merged: a.merged_on }));
+    return { matches, aliases };
+  } catch(e){
+    console.warn('Supabase read failed — falling back to static JSON files.', e);
+    return null;
+  }
+}
+
 async function loadData(){
+  const fromSupabase = await fetchFromSupabase();
+  if(fromSupabase){
+    PLAYER_ALIASES = fromSupabase.aliases;
+    ALIAS_MAP = buildAliasMap(PLAYER_ALIASES);
+    MATCHES = fromSupabase.matches;
+    dataSource = 'supabase';
+    render();
+    return;
+  }
+
+  // Fallback: static JSON files (data/historical.json + data/matches/ discovery), as before.
   const a = await fetchJsonSafe('data/player-aliases.json', null);
   PLAYER_ALIASES = a === null ? EMBEDDED_ALIASES_FALLBACK : a;
   ALIAS_MAP = buildAliasMap(PLAYER_ALIASES);

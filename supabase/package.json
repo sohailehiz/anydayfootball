@@ -1,0 +1,14 @@
+{
+  "name": "anyday-football-supabase",
+  "version": "1.0.0",
+  "private": true,
+  "description": "One-time/re-runnable loader that pushes data/historical.json + data/matches/*.json into Supabase.",
+  "type": "module",
+  "scripts": {
+    "seed": "node seed.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.110.7",
+    "dotenv": "^16.4.5"
+  }
+}
