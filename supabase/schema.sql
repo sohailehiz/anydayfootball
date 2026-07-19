@@ -63,13 +63,22 @@ create table if not exists player_profiles (
   claimed_at timestamptz not null default now()
 );
 
--- Per-match self-ratings (the "each match rating" feature from the original plan)
+-- Per-match self-ratings (self-rating only, never peer-rated). Four stats per match, each 1-10.
+-- "edited" tracks whether the player has already used their one allowed correction — see the RLS
+-- policy below, which enforces the one-edit limit at the database level, not just in the UI.
+-- (If you already ran an earlier version of this file with a single generic "rating" column,
+-- use supabase/migrate_match_ratings.sql instead of re-running this block.)
 create table if not exists match_ratings (
   id bigserial primary key,
   match_id uuid not null references matches(id) on delete cascade,
   player_id uuid not null references player_profiles(id) on delete cascade,
-  rating int not null check (rating between 1 and 10),
+  stamina int not null check (stamina between 1 and 10),
+  passing int not null check (passing between 1 and 10),
+  speed int not null check (speed between 1 and 10),
+  dribbling int not null check (dribbling between 1 and 10),
+  edited boolean not null default false,
   created_at timestamptz not null default now(),
+  updated_at timestamptz,
   unique (match_id, player_id)
 );
 
@@ -114,8 +123,15 @@ create policy "public read match_ratings" on match_ratings for select using (tru
 drop policy if exists "self write match_ratings" on match_ratings;
 create policy "self write match_ratings" on match_ratings for insert with check (auth.uid() = player_id);
 
+-- A player can only update their own rating, and only while it hasn't been edited yet. The
+-- client's update call must set edited = true as part of the same statement that makes the
+-- correction — after that, "edited = false" fails on any further attempt, locking the row
+-- regardless of what the client sends (real enforcement, not just a UI restriction).
 drop policy if exists "self update match_ratings" on match_ratings;
-create policy "self update match_ratings" on match_ratings for update using (auth.uid() = player_id);
+create policy "self update match_ratings" on match_ratings
+  for update
+  using (auth.uid() = player_id and edited = false)
+  with check (auth.uid() = player_id);
 
 -- Helpful indexes
 create index if not exists idx_match_players_match_id on match_players(match_id);

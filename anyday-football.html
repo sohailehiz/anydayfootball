@@ -92,6 +92,32 @@ input#search{
 input#search::placeholder{color:var(--chalk-dim);}
 .count-tag{font-size:12.5px;color:var(--chalk-dim);white-space:nowrap;}
 
+.rate-section{margin-top:36px;}
+.rate-section h2{font-family:'Anton',sans-serif;font-size:18px;letter-spacing:0.5px;margin:0 0 4px;}
+.rate-section .sub{font-size:12.5px;color:var(--chalk-dim);margin-bottom:16px;}
+.rate-card{
+  background:rgba(245,243,236,0.04);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px 18px;margin-bottom:12px;
+}
+.rate-card .rc-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;flex-wrap:wrap;gap:6px;}
+.rate-card .rc-loc{font-weight:700;font-size:14px;}
+.rate-card .rc-date{font-size:12px;color:var(--chalk-dim);}
+.rate-card .rc-locked{font-size:11.5px;color:var(--chalk-dim);background:rgba(0,0,0,0.2);padding:4px 10px;border-radius:999px;}
+.rate-stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:12px;}
+.rate-stat label{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--chalk-dim);margin-bottom:4px;}
+.rate-stat input{
+  width:100%;background:rgba(0,0,0,0.25);border:1px solid var(--line);border-radius:8px;
+  padding:8px 10px;color:var(--chalk);font-size:14px;font-family:'Space Mono',monospace;
+}
+.rate-stat input:focus{outline:none;border-color:var(--floodlight);}
+.rate-card button{
+  padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-weight:700;font-size:12.5px;
+  background:var(--floodlight);color:var(--ink);
+}
+.rate-card button:disabled{opacity:0.5;cursor:default;}
+.rate-locked-vals{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--chalk-dim);}
+.rate-locked-vals b{color:var(--chalk);}
+
 /* ---------- FIFA card ---------- */
 .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:22px;justify-items:center;}
 .flip-wrap{width:230px;height:330px;-webkit-perspective:1200px;perspective:1200px;cursor:pointer;}
@@ -189,6 +215,23 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentSession = null;
 let myProfile = null;
 
+// Ratings only get asked for on matches from this date onward — no retroactively demanding
+// self-ratings for every match someone's ever played. Keyed by match_id once fetched, holding
+// the row's own id (needed to update it), the four stats, and whether the one-time edit has
+// already been used.
+const RATING_CUTOFF_DATE = '2026-07-19';
+let MY_RATINGS_BY_MATCH = new Map();
+
+async function refreshMyRatings(){
+  if(!currentSession){ MY_RATINGS_BY_MATCH = new Map(); return; }
+  const { data, error } = await sb
+    .from('match_ratings')
+    .select('id, match_id, stamina, passing, speed, dribbling, edited')
+    .eq('player_id', currentSession.user.id);
+  if(error){ console.warn('Could not load your ratings.', error); return; }
+  MY_RATINGS_BY_MATCH = new Map((data||[]).map(r=>[r.match_id, r]));
+}
+
 async function initAuth(){
   const { data } = await sb.auth.getSession();
   currentSession = data.session;
@@ -199,6 +242,7 @@ async function initAuth(){
     .eq('id', currentSession.user.id)
     .maybeSingle();
   myProfile = profile;
+  await refreshMyRatings();
 }
 
 async function handleLogout(){
@@ -296,13 +340,42 @@ async function fetchFromSupabase(){
         if(row.fee_amount != null) o.f = row.fee_amount;
         return o;
       });
-      return { date: m.match_date, yr: m.yr, wd: m.wd, grp: m.grp, loc: m.loc, time: m.match_time, total: m.total, perHead: m.per_head, p, d };
+      // id is only present when the data actually came from Supabase (not the JSON fallback) —
+      // it's the real match_id used when saving a rating, so rating only works with live data.
+      return { id: m.id, date: m.match_date, yr: m.yr, wd: m.wd, grp: m.grp, loc: m.loc, time: m.match_time, total: m.total, perHead: m.per_head, p, d };
     });
     const aliases = (rawAliases||[]).map(a=>({ alias: a.alias, canonical: a.canonical, note: a.note, merged: a.merged_on }));
     return { matches, aliases };
   } catch(e){
     console.warn('Supabase read failed — falling back to static JSON files.', e);
     return null;
+  }
+}
+
+// Skill ratings, keyed by canonical player name, populated from every match_ratings row via a
+// single request (embeds the related player_profiles row to resolve player_id -> name). Only
+// available when data is live from Supabase — ratings can't exist against the static JSON
+// fallback, so every player's skill score just uses the DEFAULT_SKILL_SCORE in that mode.
+let RATINGS_BY_NAME = new Map();
+
+async function fetchAllRatings(){
+  try {
+    const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/match_ratings?select=stamina,passing,speed,dribbling,player_profiles(name)`, { headers, cache: 'no-store' });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const rows = await r.json();
+    const map = new Map();
+    (rows||[]).forEach(row=>{
+      const name = row.player_profiles && row.player_profiles.name;
+      if(!name) return;
+      const list = map.get(name) || [];
+      list.push({ stamina: row.stamina, passing: row.passing, speed: row.speed, dribbling: row.dribbling });
+      map.set(name, list);
+    });
+    return map;
+  } catch(e){
+    console.warn('Could not load match_ratings — skill scores will use the default.', e);
+    return new Map();
   }
 }
 
@@ -313,6 +386,7 @@ async function loadData(){
     ALIAS_MAP = buildAliasMap(PLAYER_ALIASES);
     MATCHES = fromSupabase.matches;
     dataSource = 'supabase';
+    RATINGS_BY_NAME = await fetchAllRatings();
     render();
     return;
   }
@@ -342,12 +416,31 @@ async function loadData(){
 }
 
 /* ============ Rating math ============
-   Overall is purely attendance-based for now: games played this season out of a 52-week year.
-   Once login + self-ratings exist, speed/stamina will feed into this instead of the flat default. */
-const WEEKS_PER_SEASON = 52;
-function computeOverall(gamesPlayed){
-  const pct = gamesPlayed / WEEKS_PER_SEASON;
-  return Math.max(1, Math.min(99, Math.round(pct * 100)));
+   Overall blends two independent scores: attendance (objective, from real match data) and skill
+   (subjective, self-rated after each match — stamina/passing/speed/dribbling, 1-10 each). Skill
+   is weighted higher (70/30) since that's the actual point of self-rating, but a player who
+   hasn't rated any matches yet gets a flat default skill score of 30 rather than 0, so a brand
+   new account isn't crushed to the bottom of the tier list before they've had a chance to rate
+   themselves even once. */
+const ATTENDANCE_WEIGHT = 0.3;
+const SKILL_WEIGHT = 0.7;
+const DEFAULT_SKILL_SCORE = 30;
+
+function computeAttendanceScore(gamesPlayed, totalGames){
+  if(!totalGames) return 0;
+  return Math.max(1, Math.min(99, Math.round((gamesPlayed / totalGames) * 100)));
+}
+// ratings: array of {stamina,passing,speed,dribbling}, each 1-10 — one entry per rated match.
+function computeSkillScore(ratings){
+  if(!ratings || !ratings.length) return DEFAULT_SKILL_SCORE;
+  const perMatchAvg = ratings.map(r => (r.stamina + r.passing + r.speed + r.dribbling) / 4);
+  const overallAvg = perMatchAvg.reduce((a,b)=>a+b, 0) / perMatchAvg.length;
+  return Math.max(1, Math.min(99, Math.round((overallAvg / 10) * 99)));
+}
+function computeOverall(gamesPlayed, totalGames, ratings){
+  const attendanceScore = computeAttendanceScore(gamesPlayed, totalGames);
+  const skillScore = computeSkillScore(ratings);
+  return Math.max(1, Math.min(99, Math.round(attendanceScore * ATTENDANCE_WEIGHT + skillScore * SKILL_WEIGHT)));
 }
 function computeStars(overall){
   return Math.max(1, Math.min(5, Math.ceil(overall/20)));
@@ -409,7 +502,15 @@ function yearBreakdown(byYear){
 }
 
 /* ============ Card rendering ============ */
-function cardFrontHTML(s, overall, tier, stars, rank){
+// Individual stat display is scaled the same way the overall skill score is (1-10 raw input ->
+// 0-99 "FIFA" range), defaulting to DEFAULT_SKILL_SCORE for anyone who hasn't rated a match yet.
+function avgStatScaled(ratings, key){
+  if(!ratings || !ratings.length) return DEFAULT_SKILL_SCORE;
+  const avg = ratings.reduce((a,r)=>a+r[key],0) / ratings.length;
+  return Math.max(1, Math.min(99, Math.round((avg/10)*99)));
+}
+
+function cardFrontHTML(s, overall, tier, stars, rank, ratings){
   return `
     <div class="card-face">
       <div class="fifa-card tier-${tier}">
@@ -424,8 +525,8 @@ function cardFrontHTML(s, overall, tier, stars, rank){
         <div class="card-name">${escapeHtml(s.name)}</div>
         <div class="card-club-line">Anyday FC</div>
         <div class="card-stats">
-          <div><span>SPD</span><b>50</b></div>
-          <div><span>STA</span><b>50</b></div>
+          <div><span>SPD</span><b>${avgStatScaled(ratings,'speed')}</b></div>
+          <div><span>STA</span><b>${avgStatScaled(ratings,'stamina')}</b></div>
           <div><span>GP</span><b>${s.count}</b></div>
           <div><span>OVR</span><b>${overall}</b></div>
         </div>
@@ -435,7 +536,9 @@ function cardFrontHTML(s, overall, tier, stars, rank){
     </div>
   `;
 }
-function cardBackHTML(s, overall, tier){
+function cardBackHTML(s, overall, tier, ratings, totalGames){
+  const attendanceScore = computeAttendanceScore(s.count, totalGames);
+  const skillScore = computeSkillScore(ratings);
   return `
     <div class="card-face back">
       <div class="card-back tier-${tier}">
@@ -443,21 +546,24 @@ function cardBackHTML(s, overall, tier){
         <div class="back-row"><div class="bl">Games played</div><div class="bv">${s.count}</div><div class="bv-sub">${yearBreakdown(s.byYear)}</div></div>
         <div class="back-row"><div class="bl">First game</div><div class="bv" style="font-size:13px;">${fmtDate(s.first)}</div></div>
         <div class="back-row"><div class="bl">Last game</div><div class="bv" style="font-size:13px;">${fmtDate(s.last)}</div></div>
-        <div class="back-row"><div class="bl">Rating calc</div><div class="bv" style="font-size:13px;">${s.count} <small>/ ${WEEKS_PER_SEASON} weeks</small></div></div>
+        <div class="back-row"><div class="bl">Attendance</div><div class="bv" style="font-size:13px;">${attendanceScore} <small>(${s.count} / ${totalGames} games)</small></div></div>
+        <div class="back-row"><div class="bl">Skill</div><div class="bv" style="font-size:13px;">${skillScore} <small>(${ratings && ratings.length ? `from ${ratings.length} rated match${ratings.length===1?'':'es'}` : 'not rated yet'})</small></div></div>
         <div class="flip-hint">↻ tap to flip back</div>
       </div>
     </div>
   `;
 }
 function cardHTML(s, rank){
-  const overall = computeOverall(s.count);
+  const ratings = RATINGS_BY_NAME.get(s.name) || [];
+  const totalGames = MATCHES.length;
+  const overall = computeOverall(s.count, totalGames, ratings);
   const tier = computeTier(overall);
   const stars = computeStars(overall);
   return `
     <div class="flip-wrap" data-flip>
       <div class="flip-inner">
-        ${cardFrontHTML(s, overall, tier, stars, rank)}
-        ${cardBackHTML(s, overall, tier)}
+        ${cardFrontHTML(s, overall, tier, stars, rank, ratings)}
+        ${cardBackHTML(s, overall, tier, ratings, totalGames)}
       </div>
     </div>
   `;
@@ -494,6 +600,13 @@ function renderMyCard(){
     return;
   }
 
+  // Matches you played in, from the rating cutoff date onward — no retroactively asking anyone
+  // to rate every match they've ever played. Newest first. Only possible against live Supabase
+  // data, since ratings need a real match_id (the JSON fallback has none).
+  const toRate = MATCHES
+    .filter(m => m.id && m.date >= RATING_CUTOFF_DATE && m.p.some(p=>p.n===s.name))
+    .sort((a,b)=> b.date.localeCompare(a.date));
+
   app.innerHTML = `
     <div class="wrap">
       <header class="topbar">
@@ -504,18 +617,104 @@ function renderMyCard(){
       <p class="tagline">This is your card. <a href="anyday-football.html?all=1" style="color:var(--floodlight);">View all players &rarr;</a></p>
 
       <div class="login-note">
-        <b>Editing coming soon.</b> Self-rating speed/stamina and editing your own card isn't built yet — ratings are calculated purely from attendance (games played ÷ 52 weeks).
+        <b>Rating formula:</b> overall = 30% attendance (games played &divide; total games) + 70% skill (your self-rated stamina/passing/speed/dribbling, averaged across every match you've rated). Unrated matches count as a flat 30 skill score until you rate at least one.
       </div>
 
       <div class="card-grid" style="justify-content:flex-start;">
         ${cardHTML(s, allPlayerStats().findIndex(p=>p.name===s.name)+1)}
+      </div>
+
+      <div class="rate-section">
+        <h2>Rate your games</h2>
+        <div class="sub">${toRate.length ? `${toRate.length} match${toRate.length===1?'':'es'} since ${fmtDate(RATING_CUTOFF_DATE)} — each stat is 1-10. You can correct a rating once after saving, then it locks.` : `No matches to rate yet since ${fmtDate(RATING_CUTOFF_DATE)}.`}</div>
+        ${toRate.map(m => renderRateCard(m, s.name)).join('')}
       </div>
     </div>
   `;
   document.querySelectorAll('[data-flip]').forEach(el=>{
     el.addEventListener('click', ()=>el.classList.toggle('flipped'));
   });
+  document.querySelectorAll('[data-save-btn]').forEach(btn=>{
+    btn.addEventListener('click', ()=>handleSaveRating(btn.dataset.matchId));
+  });
   wireNav();
+}
+
+function renderRateCard(m, playerName){
+  const existing = MY_RATINGS_BY_MATCH.get(m.id);
+  const label = `${m.loc || 'Match'} &middot; ${fmtDate(m.date)}`;
+
+  if(existing && existing.edited){
+    return `
+      <div class="rate-card" data-rating-match="${m.id}">
+        <div class="rc-top">
+          <div><div class="rc-loc">${escapeHtml(m.loc || 'Match')}</div><div class="rc-date">${fmtDate(m.date)}</div></div>
+          <div class="rc-locked">Rated &middot; locked</div>
+        </div>
+        <div class="rate-locked-vals">
+          <div>STA <b>${existing.stamina}</b></div>
+          <div>PAS <b>${existing.passing}</b></div>
+          <div>SPD <b>${existing.speed}</b></div>
+          <div>DRI <b>${existing.dribbling}</b></div>
+        </div>
+      </div>
+    `;
+  }
+
+  const isEdit = !!existing;
+  const v = key => isEdit ? existing[key] : '';
+  return `
+    <div class="rate-card" data-rating-match="${m.id}">
+      <div class="rc-top">
+        <div><div class="rc-loc">${escapeHtml(m.loc || 'Match')}</div><div class="rc-date">${fmtDate(m.date)}</div></div>
+        ${isEdit ? `<div class="rc-locked">One correction allowed</div>` : ''}
+      </div>
+      <div class="rate-stats-grid">
+        <div class="rate-stat"><label>Stamina</label><input type="number" min="1" max="10" data-stat="stamina" value="${v('stamina')}"></div>
+        <div class="rate-stat"><label>Passing</label><input type="number" min="1" max="10" data-stat="passing" value="${v('passing')}"></div>
+        <div class="rate-stat"><label>Speed</label><input type="number" min="1" max="10" data-stat="speed" value="${v('speed')}"></div>
+        <div class="rate-stat"><label>Dribbling</label><input type="number" min="1" max="10" data-stat="dribbling" value="${v('dribbling')}"></div>
+      </div>
+      <button data-save-btn data-match-id="${m.id}">${isEdit ? 'Save correction' : 'Save rating'}</button>
+    </div>
+  `;
+}
+
+async function handleSaveRating(matchId){
+  const root = document.querySelector(`[data-rating-match="${matchId}"]`);
+  const getVal = key => parseInt(root.querySelector(`[data-stat="${key}"]`).value, 10);
+  const stamina = getVal('stamina'), passing = getVal('passing'), speed = getVal('speed'), dribbling = getVal('dribbling');
+
+  for(const [label, val] of [['Stamina',stamina],['Passing',passing],['Speed',speed],['Dribbling',dribbling]]){
+    if(!Number.isInteger(val) || val<1 || val>10){
+      alert(`${label} must be a whole number from 1 to 10.`);
+      return;
+    }
+  }
+
+  const btn = root.querySelector('[data-save-btn]');
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  const existing = MY_RATINGS_BY_MATCH.get(matchId);
+  let error;
+  if(existing){
+    ({ error } = await sb.from('match_ratings')
+      .update({ stamina, passing, speed, dribbling, edited: true, updated_at: new Date().toISOString() })
+      .eq('id', existing.id));
+  } else {
+    ({ error } = await sb.from('match_ratings')
+      .insert({ match_id: matchId, player_id: currentSession.user.id, stamina, passing, speed, dribbling }));
+  }
+
+  if(error){
+    alert(`Couldn't save your rating: ${error.message}`);
+    btn.disabled = false; btn.textContent = existing ? 'Save correction' : 'Save rating';
+    return;
+  }
+
+  await refreshMyRatings();
+  RATINGS_BY_NAME = await fetchAllRatings();
+  render();
 }
 
 function wireNav(){
