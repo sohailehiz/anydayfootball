@@ -77,6 +77,8 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5;}
 .btn-secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:11px 22px;font-size:13.5px;font-weight:700;cursor:pointer;}
 .btn-secondary:hover{border-color:var(--gold);}
 .unsaved-banner{background:var(--gold);color:var(--bg);padding:10px 16px;border-radius:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;font-weight:600;flex-wrap:wrap;}
+.guest-warning-box{background:rgba(232,120,102,0.1);border:1px solid #e87866;border-radius:8px;padding:10px 14px;margin:-4px 0 14px;font-size:12.5px;}
+.guest-warning-box .gw-title{font-weight:700;color:#e87866;margin-bottom:6px;}
 .name-warning-box{background:rgba(232,199,102,0.08);border:1px solid var(--gold);border-radius:8px;padding:10px 14px;margin:-4px 0 14px;font-size:12.5px;}
 .name-warning-box .nw-title{font-weight:700;color:var(--gold);margin-bottom:6px;}
 .name-warning-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
@@ -568,6 +570,7 @@ Laya *"></textarea>
         <textarea class="form-input" id="add-dropouts" placeholder="Ichha" style="min-height:60px;"></textarea>
       </div>
 
+      <div id="guest-warnings"></div>
       <div id="name-warnings"></div>
 
       <div class="form-row">
@@ -606,7 +609,7 @@ const MONTH_LOOKUP = {jan:0,january:0,feb:1,february:1,mar:2,march:2,apr:3,april
 // "Time:", "Location:", "Total:", "Per Head:", then numbered Team A / Team B lists with ✅/✔/☑
 // checkmarks, <+50> late-fee tags, and <100>/<+100> drop-out tags) into structured fields.
 function parseWhatsAppRoster(text){
-  const result = { date: null, time: null, loc: null, total: null, perHead: null, players: [], dropouts: [] };
+  const result = { date: null, time: null, loc: null, total: null, perHead: null, players: [], dropouts: [], guestIssues: [] };
   const clean = text.replace(/[​⁠﻿]/g, ''); // strip invisible word-joiner/zero-width chars
 
   let m = clean.match(/location\s*:?\s*([^\n]+)/i);
@@ -656,6 +659,19 @@ function parseWhatsAppRoster(text){
       .replace(/no\s*show/ig, '')
       .trim();
     if(!name) continue;
+
+    // A bare "+N" (not wrapped in <>, which is reserved for the <+50>/<+100> fee tags handled
+    // above) means this player brought N guest(s), but the roster message didn't give the
+    // guest's actual name — WhatsApp rosters sometimes just say "Asad +1" and nothing else.
+    // Don't silently fold that into the player's name as garbage text ("Asad +1"); strip it,
+    // keep the real player, and flag the guest as unresolved so it has to be filled in by hand.
+    const guestMatch = name.match(/\+\s*(\d+)\b/);
+    if(guestMatch){
+      name = name.replace(/\+\s*\d+\b/, '').trim();
+      result.guestIssues.push({ line: rawLine.trim(), player: name || '(unknown)', count: parseInt(guestMatch[1],10) });
+    }
+    if(!name) continue;
+
     if(isDrop) result.dropouts.push(name);
     else if(isLate) result.players.push(name + ' *');
     else result.players.push(name);
@@ -688,10 +704,45 @@ function handleParsePaste(){
   if(!r.date) missing.push('date');
   if(!r.players.length) missing.push('players');
   if(missing.length) alert('Parsed what I could, but couldn\'t find: '+missing.join(', ')+'. Please fill those in manually.');
-  else alert('Parsed! Review the fields below, then click "Add match".');
+
+  PENDING_GUEST_ISSUES = r.guestIssues;
+  renderGuestWarnings();
+  if(r.guestIssues.length){
+    const list = r.guestIssues.map(g=>`"${g.line}" — ${g.player} brought a +${g.count} guest, but no guest name was given.`).join('\n');
+    alert(`Heads up — some players brought guests the message didn't name:\n\n${list}\n\nFind out who the guest was and add them as their own line in "Players who played" before you submit. You can't add this match until these are resolved or dismissed.`);
+  } else if(!missing.length){
+    alert('Parsed! Review the fields below, then click "Add match".');
+  }
 
   DISMISSED_NAME_WARNINGS = new Set();
   refreshNameWarnings();
+}
+
+// ---- Guest-without-a-name warnings (fed by parseWhatsAppRoster's guestIssues) ----
+let PENDING_GUEST_ISSUES = [];
+const BARE_GUEST_RE = /\+\s*\d+\b/;
+
+function renderGuestWarnings(){
+  const box = document.getElementById('guest-warnings');
+  if(!box) return;
+  if(!PENDING_GUEST_ISSUES.length){ box.innerHTML=''; return; }
+  box.innerHTML = `
+    <div class="guest-warning-box">
+      <div class="gw-title">⚠ Guest with no name</div>
+      ${PENDING_GUEST_ISSUES.map((g,i)=>`
+        <div class="name-warning-row">
+          <span>"${esc(g.line)}" — ${esc(g.player)} brought a +${g.count} guest, but no name was given.</span>
+          <button type="button" class="nw-dismiss" data-resolve-guest="${i}">I've added the guest / dismiss</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  box.querySelectorAll('[data-resolve-guest]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      PENDING_GUEST_ISSUES.splice(parseInt(btn.dataset.resolveGuest,10), 1);
+      renderGuestWarnings();
+    });
+  });
 }
 
 // ---- Known-players reference list (Add Match tab) ----
@@ -790,6 +841,18 @@ function handleAddMatch(){
   const dropoutsText = document.getElementById('add-dropouts').value;
   const totalVal = document.getElementById('add-total').value.trim();
   const perHeadVal = document.getElementById('add-perhead').value.trim();
+
+  // Hard block on unresolved "+1 guest, no name" issues from the parse step, plus a fresh scan
+  // in case someone typed a bare "+N" straight into the fields by hand instead of pasting.
+  if(PENDING_GUEST_ISSUES.length){
+    alert(`Resolve the guest warning${PENDING_GUEST_ISSUES.length===1?'':'s'} above first — find out who the +1 guest was (or dismiss the warning if you've already added them as their own line).`);
+    return;
+  }
+  const bareGuestLine = [...playersText.split('\n'), ...dropoutsText.split('\n')].find(l=>BARE_GUEST_RE.test(l));
+  if(bareGuestLine){
+    alert(`"${bareGuestLine.trim()}" looks like it has a "+N" guest marker with no guest name. Add the guest as their own line (or remove the "+N") before submitting — guests can't be saved without a name.`);
+    return;
+  }
 
   const p = parsePlayersInput(playersText);
   if(!p.length){ alert('Add at least one player who played.'); return; }
