@@ -92,6 +92,28 @@ input#search{
 input#search::placeholder{color:var(--chalk-dim);}
 .count-tag{font-size:12.5px;color:var(--chalk-dim);white-space:nowrap;}
 
+.card-and-favorites{display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;}
+.favorites-panel{
+  flex:1 1 240px;max-width:300px;background:rgba(245,243,236,0.04);border:1px solid var(--line);
+  border-radius:var(--radius);padding:18px 20px;
+}
+.favorites-panel h2{font-family:'Anton',sans-serif;font-size:16px;letter-spacing:0.5px;margin:0 0 4px;}
+.favorites-panel .sub{font-size:12px;color:var(--chalk-dim);margin-bottom:14px;}
+.favorites-panel .fav-label{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--chalk-dim);margin:12px 0 4px;}
+.favorites-panel .fav-label:first-of-type{margin-top:0;}
+.favorites-panel input{
+  width:100%;background:rgba(0,0,0,0.25);border:1px solid var(--line);border-radius:8px;
+  padding:8px 10px;color:var(--chalk);font-size:13px;font-family:'Inter',sans-serif;margin-bottom:6px;
+  box-sizing:border-box;
+}
+.favorites-panel input:focus{outline:none;border-color:var(--floodlight);}
+.favorites-panel button{
+  margin-top:10px;padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-weight:700;
+  font-size:12.5px;background:var(--floodlight);color:var(--ink);width:100%;
+}
+.favorites-panel button:disabled{opacity:0.5;cursor:default;}
+.fav-save-status{font-size:12px;color:var(--chalk-dim);margin-top:8px;min-height:14px;}
+
 .rate-section{margin-top:36px;}
 .rate-section h2{font-family:'Anton',sans-serif;font-size:18px;letter-spacing:0.5px;margin:0 0 4px;}
 .rate-section .sub{font-size:12.5px;color:var(--chalk-dim);margin-bottom:16px;}
@@ -119,8 +141,8 @@ input#search::placeholder{color:var(--chalk-dim);}
 .rate-locked-vals b{color:var(--chalk);}
 
 /* ---------- FIFA card ---------- */
-.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:22px;justify-items:center;}
-.flip-wrap{width:230px;height:330px;-webkit-perspective:1200px;perspective:1200px;cursor:pointer;}
+.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:22px;justify-items:center;}
+.flip-wrap{width:270px;height:400px;-webkit-perspective:1200px;perspective:1200px;cursor:pointer;}
 .flip-inner{position:relative;width:100%;height:100%;-webkit-transition:-webkit-transform .6s cubic-bezier(.4,.2,.2,1);transition:transform .6s cubic-bezier(.4,.2,.2,1);-webkit-transform-style:preserve-3d;transform-style:preserve-3d;-webkit-transform:rotateY(0deg);transform:rotateY(0deg);}
 .flip-wrap.flipped .flip-inner{-webkit-transform:rotateY(180deg);transform:rotateY(180deg);}
 /* card-face only handles the 3D transform + hiding; it must NOT also carry border-radius/overflow —
@@ -153,7 +175,7 @@ input#search::placeholder{color:var(--chalk-dim);}
 .card-rank{font-family:'Space Mono',monospace;font-size:12px;color:var(--ink);opacity:0.65;}
 .card-avatar-wrap{display:flex;justify-content:center;margin-top:0;position:relative;z-index:2;}
 .card-avatar{
-  width:92px;height:92px;border-radius:50%;
+  width:104px;height:104px;border-radius:50%;
   background:var(--ink);border:3px solid rgba(255,255,255,0.5);
   display:flex;align-items:center;justify-content:center;overflow:hidden;
 }
@@ -165,8 +187,8 @@ input#search::placeholder{color:var(--chalk-dim);}
 }
 .card-club-line{text-align:center;font-size:10px;color:var(--ink);opacity:0.75;margin-top:2px;position:relative;z-index:2;}
 .card-stats{
-  display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:10px;
-  font-family:'Space Mono',monospace;font-size:11px;color:var(--ink);position:relative;z-index:2;
+  display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;margin-top:8px;
+  font-family:'Space Mono',monospace;font-size:10.5px;color:var(--ink);position:relative;z-index:2;
 }
 .card-stats div{display:flex;justify-content:space-between;}
 .card-stats b{font-weight:700;}
@@ -379,6 +401,32 @@ async function fetchAllRatings(){
   }
 }
 
+// Cosmetic profile fields (favorite club/players/nations), keyed by canonical name. These are
+// freely editable — no lock — so this just reflects whatever's currently saved. Only available
+// with live Supabase data, same as ratings.
+let FAVORITES_BY_NAME = new Map();
+
+async function fetchAllFavorites(){
+  try {
+    const headers = { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` };
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/player_profiles?select=name,favorite_club,favorite_players,favorite_nations`, { headers, cache: 'no-store' });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const rows = await r.json();
+    const map = new Map();
+    (rows||[]).forEach(row=>{
+      map.set(row.name, {
+        club: row.favorite_club || null,
+        players: row.favorite_players || [],
+        nations: row.favorite_nations || []
+      });
+    });
+    return map;
+  } catch(e){
+    console.warn('Could not load player favorites.', e);
+    return new Map();
+  }
+}
+
 async function loadData(){
   const fromSupabase = await fetchFromSupabase();
   if(fromSupabase){
@@ -387,6 +435,7 @@ async function loadData(){
     MATCHES = fromSupabase.matches;
     dataSource = 'supabase';
     RATINGS_BY_NAME = await fetchAllRatings();
+    FAVORITES_BY_NAME = await fetchAllFavorites();
     render();
     return;
   }
@@ -525,8 +574,10 @@ function cardFrontHTML(s, overall, tier, stars, rank, ratings){
         <div class="card-name">${escapeHtml(s.name)}</div>
         <div class="card-club-line">Anyday FC</div>
         <div class="card-stats">
-          <div><span>SPD</span><b>${avgStatScaled(ratings,'speed')}</b></div>
           <div><span>STA</span><b>${avgStatScaled(ratings,'stamina')}</b></div>
+          <div><span>PAS</span><b>${avgStatScaled(ratings,'passing')}</b></div>
+          <div><span>SPD</span><b>${avgStatScaled(ratings,'speed')}</b></div>
+          <div><span>DRI</span><b>${avgStatScaled(ratings,'dribbling')}</b></div>
           <div><span>GP</span><b>${s.count}</b></div>
           <div><span>OVR</span><b>${overall}</b></div>
         </div>
@@ -537,17 +588,19 @@ function cardFrontHTML(s, overall, tier, stars, rank, ratings){
   `;
 }
 function cardBackHTML(s, overall, tier, ratings, totalGames){
-  const attendanceScore = computeAttendanceScore(s.count, totalGames);
   const skillScore = computeSkillScore(ratings);
+  const fav = FAVORITES_BY_NAME.get(s.name) || { club: null, players: [], nations: [] };
+  const favPlayers = (fav.players && fav.players.length) ? fav.players.filter(Boolean).join(', ') : 'not set';
+  const favNations = (fav.nations && fav.nations.length) ? fav.nations.filter(Boolean).join(', ') : 'not set';
   return `
     <div class="card-face back">
       <div class="card-back tier-${tier}">
         <div class="back-label">Season stats</div>
         <div class="back-row"><div class="bl">Games played</div><div class="bv">${s.count}</div><div class="bv-sub">${yearBreakdown(s.byYear)}</div></div>
-        <div class="back-row"><div class="bl">First game</div><div class="bv" style="font-size:13px;">${fmtDate(s.first)}</div></div>
-        <div class="back-row"><div class="bl">Last game</div><div class="bv" style="font-size:13px;">${fmtDate(s.last)}</div></div>
-        <div class="back-row"><div class="bl">Attendance</div><div class="bv" style="font-size:13px;">${attendanceScore} <small>(${s.count} / ${totalGames} games)</small></div></div>
         <div class="back-row"><div class="bl">Skill</div><div class="bv" style="font-size:13px;">${skillScore} <small>(${ratings && ratings.length ? `from ${ratings.length} rated match${ratings.length===1?'':'es'}` : 'not rated yet'})</small></div></div>
+        <div class="back-row"><div class="bl">Favorite club</div><div class="bv" style="font-size:13px;">${fav.club || 'not set'}</div></div>
+        <div class="back-row"><div class="bl">Top 3 players</div><div class="bv" style="font-size:13px;">${favPlayers}</div></div>
+        <div class="back-row"><div class="bl">Top 3 nations</div><div class="bv" style="font-size:13px;">${favNations}</div></div>
         <div class="flip-hint">↻ tap to flip back</div>
       </div>
     </div>
@@ -620,8 +673,11 @@ function renderMyCard(){
         <b>Rating formula:</b> overall = 30% attendance (games played &divide; total games) + 70% skill (your self-rated stamina/passing/speed/dribbling, averaged across every match you've rated). Unrated matches count as a flat 30 skill score until you rate at least one.
       </div>
 
-      <div class="card-grid" style="justify-content:flex-start;">
-        ${cardHTML(s, allPlayerStats().findIndex(p=>p.name===s.name)+1)}
+      <div class="card-and-favorites">
+        <div class="card-grid" style="justify-content:flex-start;">
+          ${cardHTML(s, allPlayerStats().findIndex(p=>p.name===s.name)+1)}
+        </div>
+        ${favoritesPanelHTML(s.name)}
       </div>
 
       <div class="rate-section">
@@ -637,7 +693,61 @@ function renderMyCard(){
   document.querySelectorAll('[data-save-btn]').forEach(btn=>{
     btn.addEventListener('click', ()=>handleSaveRating(btn.dataset.matchId));
   });
+  const favBtn = document.getElementById('save-favorites-btn');
+  if(favBtn) favBtn.addEventListener('click', handleSaveFavorites);
   wireNav();
+}
+
+function favoritesPanelHTML(name){
+  const fav = FAVORITES_BY_NAME.get(name) || { club: null, players: [], nations: [] };
+  const players = [fav.players?.[0]||'', fav.players?.[1]||'', fav.players?.[2]||''];
+  const nations = [fav.nations?.[0]||'', fav.nations?.[1]||'', fav.nations?.[2]||''];
+  return `
+    <div class="favorites-panel">
+      <h2>Your favorites</h2>
+      <div class="sub">Shown on the back of your card. Update these anytime — no limit on edits.</div>
+      <label class="fav-label">Favorite club</label>
+      <input id="fav-club" type="text" value="${escapeHtml(fav.club || '')}" placeholder="e.g. Arsenal">
+      <label class="fav-label">Top 3 players</label>
+      <input id="fav-player-0" type="text" value="${escapeHtml(players[0])}" placeholder="Player 1">
+      <input id="fav-player-1" type="text" value="${escapeHtml(players[1])}" placeholder="Player 2">
+      <input id="fav-player-2" type="text" value="${escapeHtml(players[2])}" placeholder="Player 3">
+      <label class="fav-label">Top 3 nations</label>
+      <input id="fav-nation-0" type="text" value="${escapeHtml(nations[0])}" placeholder="Nation 1">
+      <input id="fav-nation-1" type="text" value="${escapeHtml(nations[1])}" placeholder="Nation 2">
+      <input id="fav-nation-2" type="text" value="${escapeHtml(nations[2])}" placeholder="Nation 3">
+      <button id="save-favorites-btn">Save favorites</button>
+      <div id="fav-save-status" class="fav-save-status"></div>
+    </div>
+  `;
+}
+
+async function handleSaveFavorites(){
+  const btn = document.getElementById('save-favorites-btn');
+  const status = document.getElementById('fav-save-status');
+  const club = document.getElementById('fav-club').value.trim() || null;
+  const players = ['fav-player-0','fav-player-1','fav-player-2']
+    .map(id => document.getElementById(id).value.trim())
+    .filter(Boolean);
+  const nations = ['fav-nation-0','fav-nation-1','fav-nation-2']
+    .map(id => document.getElementById(id).value.trim())
+    .filter(Boolean);
+
+  btn.disabled = true; btn.textContent = 'Saving...';
+  const { error } = await sb.from('player_profiles')
+    .update({ favorite_club: club, favorite_players: players.length ? players : null, favorite_nations: nations.length ? nations : null })
+    .eq('id', currentSession.user.id);
+
+  if(error){
+    status.textContent = `Couldn't save: ${error.message}`;
+    btn.disabled = false; btn.textContent = 'Save favorites';
+    return;
+  }
+
+  FAVORITES_BY_NAME = await fetchAllFavorites();
+  btn.disabled = false; btn.textContent = 'Save favorites';
+  status.textContent = 'Saved.';
+  setTimeout(render, 900);
 }
 
 function renderRateCard(m, playerName){

@@ -60,7 +60,11 @@ create table if not exists player_profiles (
   name text not null unique,
   stamina int not null default 50 check (stamina between 1 and 99),
   speed int not null default 50 check (speed between 1 and 99),
-  claimed_at timestamptz not null default now()
+  claimed_at timestamptz not null default now(),
+  -- Freely editable cosmetic preferences, capped at 3 each — no lock, unlike match_ratings.
+  favorite_club text,
+  favorite_players text[] check (favorite_players is null or cardinality(favorite_players) <= 3),
+  favorite_nations text[] check (favorite_nations is null or cardinality(favorite_nations) <= 3)
 );
 
 -- Per-match self-ratings (self-rating only, never peer-rated). Four stats per match, each 1-10.
