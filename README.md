@@ -16,7 +16,7 @@ All pages share a sticky top nav (Home / My Card or Players / Match Archive / Lo
 Match data lives in two places that are kept in sync:
 
 - **JSON files (source of truth)** — `data/historical.json` (frozen archive) plus `data/matches/*.json` (one timestamped file per batch added since). Both HTML pages embed a copy of `historical.json` as an offline fallback so they still work over `file://` or if Supabase is unreachable.
-- **Supabase (`matches`, `match_players`, `match_dropouts`)** — what the pages actually read from on a normal load. Populated from the JSON files by `supabase/seed.mjs`, which wipes and reloads these three tables fresh every run so they always match what's on disk.
+- **Supabase (`matches`, `match_players`, `match_dropouts`)** — what the pages actually read from on a normal load. Populated from the JSON files by `supabase/seed.mjs`, which upserts each match onto a deterministic key (date+time+location+group) rather than wiping the table, so a match keeps the same database id across reseeds — that matters because `match_ratings` references it, and an earlier version of this script regenerated ids on every run, silently deleting everyone's self-ratings each time. See "Supabase backend" below if you're on an older project.
 
 Login/rating/preference data lives only in Supabase, never in the JSON files:
 
@@ -70,6 +70,7 @@ If you already have a running project and are just picking up new schema changes
 
 - **`migrate_match_ratings.sql`** — adds the four-stat rating columns and the one-edit-lock policy.
 - **`migrate_profile_favorites.sql`** — adds `favorite_club`/`favorite_players`/`favorite_nations` to `player_profiles`.
+- **`migrate_stable_match_ids.sql`** — adds `source_key` to `matches` and a uniqueness constraint on it, so `seed.mjs` can upsert matches instead of wiping the table. Run this once if your project predates this fix (does not restore ratings already lost to a past reseed — only prevents future ones).
 
 Other scripts in `supabase/`:
 

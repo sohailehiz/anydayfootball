@@ -7,6 +7,13 @@
 -- ============================================================
 create table if not exists matches (
   id uuid primary key default gen_random_uuid(),
+  -- Deterministic key (date|time|loc|grp) so seed.mjs can upsert a match instead of deleting and
+  -- reinserting it. That matters because match_ratings.match_id cascades on delete — if a match's
+  -- id changed on every reseed, every player's self-ratings for that match would be silently
+  -- wiped out each time the site owner reseeds (which happens routinely, e.g. after every new
+  -- match or player-name merge). Keeping the same source data always resolves to the same row,
+  -- and therefore the same id, across reseeds.
+  source_key text not null unique,
   match_date date not null,
   yr text not null,
   wd text,                    -- weekday label as recorded in the source data (Sun/Wed/Fri...)
