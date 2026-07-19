@@ -493,6 +493,11 @@ function computeAttendanceScore(gamesPlayed, totalGames){
   if(!totalGames) return 0;
   return Math.max(1, Math.min(99, Math.round((gamesPlayed / totalGames) * 100)));
 }
+// Attendance is scoped to the current calendar year — games played this year ÷ total games
+// recorded this year — so the score reflects this season rather than accumulating forever.
+function getCurrentYear(){
+  return String(new Date().getFullYear());
+}
 // ratings: array of {stamina,passing,speed,dribbling}, each 1-10 — one entry per rated match.
 function computeSkillScore(ratings){
   if(!ratings || !ratings.length) return DEFAULT_SKILL_SCORE;
@@ -578,6 +583,7 @@ function cardFrontHTML(s, overall, tier, stars, rank, ratings){
   const avatarInner = fav && fav.avatarUrl
     ? `<img src="${escapeHtml(fav.avatarUrl)}" alt="${escapeHtml(s.name)}">`
     : defaultAvatarSVG(s.name);
+  const yearGamesPlayed = s.byYear.get(getCurrentYear()) || 0;
   return `
     <div class="card-face">
       <div class="fifa-card tier-${tier}">
@@ -596,7 +602,7 @@ function cardFrontHTML(s, overall, tier, stars, rank, ratings){
           <div><span>PAS</span><b>${avgStatScaled(ratings,'passing')}</b></div>
           <div><span>SPD</span><b>${avgStatScaled(ratings,'speed')}</b></div>
           <div><span>DRI</span><b>${avgStatScaled(ratings,'dribbling')}</b></div>
-          <div><span>GP</span><b>${s.count}</b></div>
+          <div><span>GP</span><b>${yearGamesPlayed}</b></div>
           <div><span>OVR</span><b>${overall}</b></div>
         </div>
         <div class="tier-badge">${tier}</div>
@@ -605,7 +611,7 @@ function cardFrontHTML(s, overall, tier, stars, rank, ratings){
     </div>
   `;
 }
-function cardBackHTML(s, overall, tier, ratings, totalGames){
+function cardBackHTML(s, overall, tier, ratings){
   const skillScore = computeSkillScore(ratings);
   const fav = FAVORITES_BY_NAME.get(s.name) || { club: null, players: [], nations: [] };
   const favPlayers = (fav.players && fav.players.length) ? fav.players.filter(Boolean).join(', ') : 'not set';
@@ -626,15 +632,17 @@ function cardBackHTML(s, overall, tier, ratings, totalGames){
 }
 function cardHTML(s, rank){
   const ratings = RATINGS_BY_NAME.get(s.name) || [];
-  const totalGames = MATCHES.length;
-  const overall = computeOverall(s.count, totalGames, ratings);
+  const currentYear = getCurrentYear();
+  const yearGamesPlayed = s.byYear.get(currentYear) || 0;
+  const yearTotalGames = MATCHES.filter(m=>m.yr===currentYear).length;
+  const overall = computeOverall(yearGamesPlayed, yearTotalGames, ratings);
   const tier = computeTier(overall);
   const stars = computeStars(overall);
   return `
     <div class="flip-wrap" data-flip>
       <div class="flip-inner">
         ${cardFrontHTML(s, overall, tier, stars, rank, ratings)}
-        ${cardBackHTML(s, overall, tier, ratings, totalGames)}
+        ${cardBackHTML(s, overall, tier, ratings)}
       </div>
     </div>
   `;
@@ -688,7 +696,7 @@ function renderMyCard(){
       <p class="tagline">This is your card. <a href="anyday-football.html?all=1" style="color:var(--floodlight);">View all players &rarr;</a></p>
 
       <div class="login-note">
-        <b>Rating formula:</b> overall = 30% attendance (games played &divide; total games) + 70% skill (your self-rated stamina/passing/speed/dribbling, averaged across every match you've rated). Unrated matches count as a flat 30 skill score until you rate at least one.
+        <b>Rating formula:</b> overall = 30% attendance (this year's games played &divide; this year's total games) + 70% skill (your self-rated stamina/passing/speed/dribbling, averaged across every match you've rated). Unrated matches count as a flat 30 skill score until you rate at least one, and attendance resets each calendar year.
       </div>
 
       <div class="card-and-favorites">
