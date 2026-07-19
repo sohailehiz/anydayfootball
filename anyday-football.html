@@ -463,7 +463,75 @@ function cardHTML(s, rank){
   `;
 }
 
+function navHTML(current){
+  const loginLink = currentSession
+    ? `<a href="anyday-football.html">My Card</a><a href="anyday-football.html?all=1" class="${current==='all'?'current':''}">Players</a><a href="#" id="logout-link">Log out</a>`
+    : `<a href="anyday-football.html?all=1" class="${current==='all'?'current':''}">Players</a><a href="login.html">Login</a>`;
+  return `
+    <a href="index.html">Home</a>
+    ${loginLink}
+    <a href="anyday-match-archive.html">Match Archive</a>
+  `;
+}
+
+function renderMyCard(){
+  const s = allPlayerStats().find(p=>p.name===myProfile.name);
+  const app = document.getElementById('app');
+
+  if(!s){
+    // Shouldn't normally happen — you can only log in as a name that's in the match archive —
+    // but handle it gracefully rather than showing a blank page.
+    app.innerHTML = `
+      <div class="wrap">
+        <header class="topbar">
+          <div class="logo-row"><span class="logo-ball">⚽</span><span class="logo-text display">Player Cards</span></div>
+          <nav class="site-nav">${navHTML('me')}</nav>
+        </header>
+        <div class="empty-state"><div class="big">🏟️</div>Couldn't find match data for ${escapeHtml(myProfile.name)} yet.</div>
+      </div>
+    `;
+    wireNav();
+    return;
+  }
+
+  app.innerHTML = `
+    <div class="wrap">
+      <header class="topbar">
+        <div class="logo-row"><span class="logo-ball">⚽</span><span class="logo-text display">Player Cards</span></div>
+        <nav class="site-nav">${navHTML('me')}</nav>
+      </header>
+      <h1 class="brand">Welcome back,<br><span>${escapeHtml(s.name)}</span>.</h1>
+      <p class="tagline">This is your card. <a href="anyday-football.html?all=1" style="color:var(--floodlight);">View all players &rarr;</a></p>
+
+      <div class="login-note">
+        <b>Editing coming soon.</b> Self-rating speed/stamina and editing your own card isn't built yet — ratings are calculated purely from attendance (games played ÷ 52 weeks).
+      </div>
+
+      <div class="card-grid" style="justify-content:flex-start;">
+        ${cardHTML(s, allPlayerStats().findIndex(p=>p.name===s.name)+1)}
+      </div>
+    </div>
+  `;
+  document.querySelectorAll('[data-flip]').forEach(el=>{
+    el.addEventListener('click', ()=>el.classList.toggle('flipped'));
+  });
+  wireNav();
+}
+
+function wireNav(){
+  const logoutLink = document.getElementById('logout-link');
+  if(logoutLink) logoutLink.addEventListener('click', (e)=>{ e.preventDefault(); handleLogout(); });
+}
+
 function render(){
+  // Logged-in players land on their own card by default. Adding ?all=1 to the URL (or clicking
+  // "Players" in the nav) always shows the full gallery instead, even while logged in.
+  const showAll = new URLSearchParams(location.search).get('all') === '1';
+  if(currentSession && myProfile && !showAll){
+    renderMyCard();
+    return;
+  }
+
   const stats = playerStats();
   const q = searchTerm.trim().toLowerCase();
   const filtered = q ? stats.filter(s=>s.name.toLowerCase().includes(q)) : stats;
@@ -472,12 +540,7 @@ function render(){
     <div class="wrap">
       <header class="topbar">
         <div class="logo-row"><span class="logo-ball">⚽</span><span class="logo-text display">Player Cards</span></div>
-        <nav class="site-nav">
-          <a href="index.html">Home</a>
-          <a class="current" href="anyday-football.html">Players</a>
-          <a href="anyday-match-archive.html">Match Archive</a>
-          <a href="login.html">Login</a>
-        </nav>
+        <nav class="site-nav">${navHTML('all')}</nav>
       </header>
       <h1 class="brand">Every regular.<br><span>One card each.</span></h1>
       <p class="tagline">FIFA-style cards, generated automatically from the match archive. Anyone who's played more than once gets a card.</p>
@@ -516,9 +579,14 @@ function render(){
       newSearchEl.setSelectionRange(cursorPos, cursorPos);
     }
   });
+  wireNav();
 }
 
-loadData();
+async function init(){
+  await initAuth();
+  await loadData();
+}
+init();
 </script>
 </body>
 </html>
