@@ -77,6 +77,20 @@ textarea.form-input{resize:vertical;min-height:90px;line-height:1.5;}
 .btn-secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:999px;padding:11px 22px;font-size:13.5px;font-weight:700;cursor:pointer;}
 .btn-secondary:hover{border-color:var(--gold);}
 .unsaved-banner{background:var(--gold);color:var(--bg);padding:10px 16px;border-radius:10px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;font-weight:600;flex-wrap:wrap;}
+.name-warning-box{background:rgba(232,199,102,0.08);border:1px solid var(--gold);border-radius:8px;padding:10px 14px;margin:-4px 0 14px;font-size:12.5px;}
+.name-warning-box .nw-title{font-weight:700;color:var(--gold);margin-bottom:6px;}
+.name-warning-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;}
+.name-warning-row:last-child{margin-bottom:0;}
+.name-warning-row .nw-btn{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:11.5px;cursor:pointer;color:var(--text);}
+.name-warning-row .nw-btn:hover{border-color:var(--gold);}
+.name-warning-row .nw-dismiss{background:none;border:none;color:var(--dim);font-size:11.5px;cursor:pointer;text-decoration:underline;padding:0;}
+.known-players-ref{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin-bottom:14px;}
+.known-players-ref summary{cursor:pointer;font-size:12.5px;color:var(--dim);font-weight:600;}
+.known-players-ref summary:hover{color:var(--text);}
+.known-players-ref[open] summary{color:var(--text);margin-bottom:2px;}
+.known-players-list{display:flex;flex-wrap:wrap;gap:6px;max-height:180px;overflow-y:auto;padding-top:4px;}
+.known-players-list .kp-pill{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px;color:var(--text);}
+.known-players-list .kp-empty{font-size:12px;color:var(--dim);}
 .unsaved-banner button{background:var(--bg);color:var(--gold);border:none;border-radius:999px;padding:7px 14px;font-weight:700;cursor:pointer;font-size:12.5px;}
 .dual-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
 @media (max-width:640px){.dual-col{grid-template-columns:1fr;}}
@@ -176,6 +190,57 @@ function buildAliasMap(list){
 }
 function normalizeName(n){
   return ALIAS_MAP.get(n) || n;
+}
+
+// ---- Name typo/duplicate detection for the Add Match form ----
+// Every name that's ever actually appeared in MATCHES (which already has aliases applied), so
+// "known good" spellings to check newly-typed/parsed names against.
+function getKnownNames(){
+  const set = new Set();
+  MATCHES.forEach(m=>{
+    m.p.forEach(p=>set.add(p.n));
+    (m.d||[]).forEach(d=>set.add(d.n));
+  });
+  return [...set];
+}
+function levenshtein(a, b){
+  a = a.toLowerCase(); b = b.toLowerCase();
+  const dp = Array.from({length: a.length+1}, (_, i) => [i, ...Array(b.length).fill(0)]);
+  for(let j=0;j<=b.length;j++) dp[0][j] = j;
+  for(let i=1;i<=a.length;i++){
+    for(let j=1;j<=b.length;j++){
+      dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    }
+  }
+  return dp[a.length][b.length];
+}
+// For each candidate name, finds the closest known name that's NOT an exact (case-insensitive)
+// match — i.e. something that's suspiciously close but not identical, like "Ichha" vs "Iccha".
+// Deliberately tight: only a single-character difference (one typo/transposition/swap) trips
+// this, and names of 3 letters or fewer are skipped entirely. Tested against the real 85-name
+// roster — a looser distance-2 threshold flagged ~12 pairs of genuinely different people (e.g.
+// "Rohan"/"Rohit", "Aishna"/"Krishna"); distance-1 only catches true typos like "Iccha"/"Ichha"
+// and "Kewal"/"Kewel", plus one plausible false positive ("Rehan"/"Rohan") that's a one-click
+// dismiss rather than a blocker.
+function findNameWarnings(candidateNames){
+  const known = getKnownNames();
+  const warnings = [];
+  const seen = new Set();
+  candidateNames.forEach(raw=>{
+    const name = raw.trim();
+    if(!name || name.length <= 3 || seen.has(name.toLowerCase())) return;
+    seen.add(name.toLowerCase());
+    if(known.some(k=>k.toLowerCase()===name.toLowerCase())) return; // exact match, nothing to flag
+    let best = null, bestDist = Infinity;
+    known.forEach(k=>{
+      const dist = levenshtein(name, k);
+      if(dist < bestDist){ bestDist = dist; best = k; }
+    });
+    if(best && bestDist === 1){
+      warnings.push({ input: name, suggestion: best });
+    }
+  });
+  return warnings;
 }
 function recomputeMatches(){
   MATCHES = HISTORICAL_MATCHES.concat(PUBLISHED_NEW_MATCHES).concat(PENDING_MATCHES).map(m=>({
@@ -486,6 +551,12 @@ Team A
         </div>
       </div>
 
+      <details class="known-players-ref">
+        <summary>📋 Known players (<span id="known-players-count">0</span>) — click to check spelling before you type</summary>
+        <input class="form-input" type="text" id="known-players-filter" placeholder="Filter..." style="margin:10px 0;">
+        <div id="known-players-list" class="known-players-list"></div>
+      </details>
+
       <div class="form-group">
         <label>Players who played (one per line — add a * at the end for a late fee)</label>
         <textarea class="form-input" id="add-players" placeholder="Sohail
@@ -497,6 +568,8 @@ Laya *"></textarea>
         <label>Dropouts (optional, one per line — "Name" or "Name:fee", defaults to ₹100)</label>
         <textarea class="form-input" id="add-dropouts" placeholder="Ichha" style="min-height:60px;"></textarea>
       </div>
+
+      <div id="name-warnings"></div>
 
       <div class="form-row">
         <div class="form-group">
@@ -591,14 +664,92 @@ function handleParsePaste(){
   if(r.time) document.getElementById('add-time').value = r.time;
   if(r.total != null) document.getElementById('add-total').value = r.total;
   if(r.perHead != null) document.getElementById('add-perhead').value = r.perHead;
-  if(r.players.length) document.getElementById('add-players').value = r.players.join('\n');
-  if(r.dropouts.length) document.getElementById('add-dropouts').value = r.dropouts.join('\n');
+  // Silently apply known aliases (e.g. "Kush" -> "Kushal") so already-known typos never even
+  // reach the textarea — only genuinely new lookalikes need the warning panel below.
+  const normalizedPlayers = r.players.map(line=>{
+    const isLate = /\*\s*$/.test(line);
+    const name = normalizeName(line.replace(/\*\s*$/,'').trim());
+    return isLate ? `${name} *` : name;
+  });
+  const normalizedDropouts = r.dropouts.map(name=>normalizeName(name.trim()));
+  if(normalizedPlayers.length) document.getElementById('add-players').value = normalizedPlayers.join('\n');
+  if(normalizedDropouts.length) document.getElementById('add-dropouts').value = normalizedDropouts.join('\n');
 
   const missing = [];
   if(!r.date) missing.push('date');
   if(!r.players.length) missing.push('players');
   if(missing.length) alert('Parsed what I could, but couldn\'t find: '+missing.join(', ')+'. Please fill those in manually.');
   else alert('Parsed! Review the fields below, then click "Add match".');
+
+  DISMISSED_NAME_WARNINGS = new Set();
+  refreshNameWarnings();
+}
+
+// ---- Known-players reference list (Add Match tab) ----
+function renderKnownPlayersRef(filterText){
+  const listEl = document.getElementById('known-players-list');
+  const countEl = document.getElementById('known-players-count');
+  if(!listEl) return;
+  const all = getKnownNames().sort((a,b)=>a.localeCompare(b));
+  if(countEl) countEl.textContent = all.length;
+  const q = (filterText||'').trim().toLowerCase();
+  const filtered = q ? all.filter(n=>n.toLowerCase().includes(q)) : all;
+  listEl.innerHTML = filtered.length
+    ? filtered.map(n=>`<span class="kp-pill">${esc(n)}</span>`).join('')
+    : `<span class="kp-empty">No players match "${esc(filterText)}".</span>`;
+}
+
+// ---- Name warnings UI (fed by findNameWarnings, defined above) ----
+let DISMISSED_NAME_WARNINGS = new Set();
+
+function refreshNameWarnings(){
+  const box = document.getElementById('name-warnings');
+  if(!box) return;
+  const playersText = document.getElementById('add-players')?.value || '';
+  const dropoutsText = document.getElementById('add-dropouts')?.value || '';
+  const candidates = [
+    ...playersText.split('\n').map(l=>l.replace(/\*\s*$/,'').trim()),
+    ...dropoutsText.split('\n').map(l=>l.replace(/:\s*\d+$/,'').trim())
+  ].filter(Boolean);
+  const warnings = findNameWarnings(candidates).filter(w=>!DISMISSED_NAME_WARNINGS.has(w.input.toLowerCase()));
+  if(!warnings.length){ box.innerHTML=''; return; }
+  box.innerHTML = `
+    <div class="name-warning-box">
+      <div class="nw-title">⚠ Possible duplicate names</div>
+      ${warnings.map(w=>`
+        <div class="name-warning-row">
+          <span>"${esc(w.input)}" looks similar to existing player "${esc(w.suggestion)}".</span>
+          <button type="button" class="nw-btn" data-fix-from="${esc(w.input)}" data-fix-to="${esc(w.suggestion)}">Use "${esc(w.suggestion)}"</button>
+          <button type="button" class="nw-dismiss" data-dismiss="${esc(w.input)}">This is a new player</button>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  box.querySelectorAll('[data-fix-from]').forEach(btn=>{
+    btn.addEventListener('click', ()=>applyNameFix(btn.dataset.fixFrom, btn.dataset.fixTo));
+  });
+  box.querySelectorAll('[data-dismiss]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      DISMISSED_NAME_WARNINGS.add(btn.dataset.dismiss.toLowerCase());
+      refreshNameWarnings();
+    });
+  });
+}
+
+// Rewrites a single name in-place within the players/dropouts textareas, preserving any trailing
+// "*" (late fee) or ":fee" (dropout fee) suffix on that line.
+function applyNameFix(from, to){
+  ['add-players','add-dropouts'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.value = el.value.split('\n').map(line=>{
+      const suffixMatch = line.match(/(\*\s*|:\s*\d+)$/);
+      const suffix = suffixMatch ? suffixMatch[0] : '';
+      const bare = suffix ? line.slice(0, line.length - suffix.length).trim() : line.trim();
+      return bare.toLowerCase() === from.toLowerCase() ? to + (suffix ? ' ' + suffix.trim() : '') : line;
+    }).join('\n');
+  });
+  refreshNameWarnings();
 }
 
 function parsePlayersInput(text){
@@ -634,6 +785,15 @@ function handleAddMatch(){
   const p = parsePlayersInput(playersText);
   if(!p.length){ alert('Add at least one player who played.'); return; }
   const d = parseDropoutsInput(dropoutsText);
+
+  // Final safety net in case names were hand-typed/edited after parsing (or without parsing at
+  // all) and never passed through the warning panel above.
+  const unresolvedWarnings = findNameWarnings([...p.map(x=>x.n), ...d.map(x=>x.n)])
+    .filter(w=>!DISMISSED_NAME_WARNINGS.has(w.input.toLowerCase()));
+  if(unresolvedWarnings.length){
+    const list = unresolvedWarnings.map(w=>`"${w.input}" (looks like "${w.suggestion}")`).join('\n');
+    if(!confirm(`These names look like possible typos of existing players:\n\n${list}\n\nAdd the match anyway with these as-typed?`)) return;
+  }
 
   if(MATCHES.some(m=>m.date===date)){
     if(!confirm('A match on this date already exists. Add another entry for the same date anyway?')) return;
@@ -865,6 +1025,15 @@ function render(){
   if(bannerDownloadBtn) bannerDownloadBtn.addEventListener('click', downloadPendingMatches);
   const parseBtn = document.getElementById('add-parse-btn');
   if(parseBtn) parseBtn.addEventListener('click', handleParsePaste);
+  const addPlayersEl = document.getElementById('add-players');
+  const addDropoutsEl = document.getElementById('add-dropouts');
+  if(addPlayersEl){ addPlayersEl.addEventListener('blur', refreshNameWarnings); refreshNameWarnings(); }
+  if(addDropoutsEl) addDropoutsEl.addEventListener('blur', refreshNameWarnings);
+  const knownFilterEl = document.getElementById('known-players-filter');
+  if(knownFilterEl){
+    renderKnownPlayersRef('');
+    knownFilterEl.addEventListener('input', e=>renderKnownPlayersRef(e.target.value));
+  }
 }
 
 loadData();
