@@ -1,0 +1,54 @@
+[
+  {
+    "date": "2026-07-19",
+    "yr": "2026",
+    "wd": "Sun",
+    "grp": "m",
+    "loc": "Apollo",
+    "time": "7am - 8:30am",
+    "p": [
+      {
+        "n": "Jason"
+      },
+      {
+        "n": "Vineet"
+      },
+      {
+        "n": "Sid"
+      },
+      {
+        "n": "Iccha"
+      },
+      {
+        "n": "Kush"
+      },
+      {
+        "n": "Laya"
+      },
+      {
+        "n": "Kewal"
+      },
+      {
+        "n": "Sohail"
+      },
+      {
+        "n": "Pratyusha"
+      },
+      {
+        "n": "Jagmeet"
+      },
+      {
+        "n": "Sijal"
+      },
+      {
+        "n": "Subhankar"
+      },
+      {
+        "n": "Garima"
+      }
+    ],
+    "d": [],
+    "total": 3090,
+    "perHead": 237
+  }
+]
