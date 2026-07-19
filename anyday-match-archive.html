@@ -773,7 +773,19 @@ function render(){
   `;
 
   const searchEl = document.getElementById('search');
-  if(searchEl) searchEl.addEventListener('input', e=>{ state.search = e.target.value; render(); });
+  if(searchEl) searchEl.addEventListener('input', e=>{
+    // Re-rendering via innerHTML destroys and recreates the <input>, which drops focus and
+    // closes the mobile keyboard after every keystroke. Re-focus the new node synchronously
+    // (same tick) and restore the cursor position so typing feels continuous on mobile.
+    const cursorPos = e.target.selectionStart;
+    state.search = e.target.value;
+    render();
+    const newSearchEl = document.getElementById('search');
+    if(newSearchEl){
+      newSearchEl.focus();
+      newSearchEl.setSelectionRange(cursorPos, cursorPos);
+    }
+  });
   document.querySelectorAll('.tab-btn').forEach(b=>b.addEventListener('click', ()=>{ state.view=b.dataset.view; render(); }));
   document.querySelectorAll('#grp-pills .pill').forEach(b=>b.addEventListener('click', ()=>{ state.grp=b.dataset.grp; render(); }));
   document.querySelectorAll('#year-pills .pill').forEach(b=>b.addEventListener('click', ()=>{ state.year=b.dataset.year; render(); }));
@@ -791,10 +803,6 @@ function render(){
   if(bannerDownloadBtn) bannerDownloadBtn.addEventListener('click', downloadPendingMatches);
   const parseBtn = document.getElementById('add-parse-btn');
   if(parseBtn) parseBtn.addEventListener('click', handleParsePaste);
-
-  // preserve focus/cursor in search box after re-render
-  const s = document.getElementById('search');
-  if(document.activeElement !== s && state.search){ /* no-op */ }
 }
 
 loadData();

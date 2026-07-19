@@ -413,7 +413,19 @@ function render(){
     el.addEventListener('click', ()=>el.classList.toggle('flipped'));
   });
   const searchEl = document.getElementById('search');
-  if(searchEl) searchEl.addEventListener('input', e=>{ searchTerm = e.target.value; render(); });
+  if(searchEl) searchEl.addEventListener('input', e=>{
+    // Re-rendering via innerHTML destroys and recreates the <input>, which drops focus and
+    // closes the mobile keyboard after every keystroke. Re-focus the new node synchronously
+    // (same tick) and restore the cursor position so typing feels continuous on mobile.
+    const cursorPos = e.target.selectionStart;
+    searchTerm = e.target.value;
+    render();
+    const newSearchEl = document.getElementById('search');
+    if(newSearchEl){
+      newSearchEl.focus();
+      newSearchEl.setSelectionRange(cursorPos, cursorPos);
+    }
+  });
 }
 
 loadData();
