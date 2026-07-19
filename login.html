@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anyday Football — Login</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap');
+
+:root{
+  --pitch-dark:#08281c;
+  --pitch:#0f4230;
+  --pitch-mid:#123f2e;
+  --line:rgba(245,243,236,0.10);
+  --chalk:#f5f3ec;
+  --chalk-dim:rgba(245,243,236,0.62);
+  --ink:#081712;
+  --gold:#c9a227;
+  --gold-light:#e8c766;
+  --floodlight:#ffdd57;
+  --bad:#ff6b6b;
+  --radius:14px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:'Inter',sans-serif; color:var(--chalk); min-height:100vh;
+  background:
+    radial-gradient(circle at 15% 8%, rgba(255,221,87,0.06), transparent 40%),
+    repeating-linear-gradient(90deg, var(--pitch) 0px, var(--pitch) 64px, var(--pitch-mid) 64px, var(--pitch-mid) 128px),
+    var(--pitch-dark);
+}
+.wrap{max-width:1100px;margin:0 auto;padding:0 20px 80px;}
+header.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px; margin:0 0 40px;
+  border-bottom:1px solid var(--line);
+  position:sticky;top:0;z-index:10;
+  background:var(--pitch-dark);
+}
+.logo-row{display:flex;align-items:center;gap:10px;}
+.logo-ball{font-size:22px;}
+.logo-text{font-family:'Anton',sans-serif;font-size:20px;letter-spacing:0.5px;}
+.site-nav{display:flex;gap:8px;}
+.site-nav a{color:var(--chalk-dim);font-size:13px;text-decoration:none;border:1px solid var(--line);padding:6px 14px;border-radius:20px;}
+.site-nav a:hover{border-color:var(--floodlight);color:var(--floodlight);}
+.site-nav a.current{color:var(--ink);background:var(--floodlight);border-color:var(--floodlight);}
+
+.login-shell{max-width:380px;margin:40px auto 0;}
+h1.brand{
+  font-family:'Anton',sans-serif; text-align:center;
+  font-size:clamp(26px,5vw,34px); letter-spacing:1px; margin:0 0 8px; line-height:0.95;
+}
+h1.brand span{color:var(--floodlight);}
+.tagline{color:var(--chalk-dim);font-size:13.5px;text-align:center;margin:0 0 32px;line-height:1.6;}
+
+.card{
+  background:rgba(245,243,236,0.04); border:1px solid var(--line); border-radius:var(--radius);
+  padding:26px 24px;
+}
+label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--chalk-dim);margin-bottom:6px;}
+input[type=text], input[type=password]{
+  width:100%; background:rgba(0,0,0,0.25); border:1px solid var(--line); border-radius:10px;
+  padding:11px 14px; color:var(--chalk); font-size:15px; font-family:'Inter',sans-serif; margin-bottom:16px;
+}
+input[type=text]::placeholder, input[type=password]::placeholder{color:rgba(245,243,236,0.35);}
+input:focus{outline:none;border-color:var(--floodlight);}
+
+button{
+  width:100%; padding:12px; border-radius:10px; border:none; cursor:pointer;
+  font-family:'Inter',sans-serif; font-weight:700; font-size:14px; letter-spacing:0.3px;
+  background:var(--floodlight); color:var(--ink); transition:opacity 0.15s;
+}
+button:hover{opacity:0.9;}
+button:disabled{opacity:0.5;cursor:default;}
+button.secondary{background:transparent;border:1px solid var(--line);color:var(--chalk-dim);margin-top:10px;}
+button.secondary:hover{border-color:var(--floodlight);color:var(--floodlight);}
+
+.msg{font-size:12.5px;line-height:1.5;margin-bottom:16px;padding:10px 12px;border-radius:8px;}
+.msg.error{background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.3);color:#ffb3b3;}
+.msg.info{background:rgba(255,221,87,0.08);border:1px solid var(--line);color:var(--chalk-dim);}
+.msg.success{background:rgba(120,220,160,0.1);border:1px solid rgba(120,220,160,0.3);color:#a8e8c0;}
+
+.hint{font-size:11.5px;color:var(--chalk-dim);margin:-8px 0 16px;line-height:1.5;}
+.step-name{font-size:15px;font-weight:700;margin-bottom:2px;}
+.change-name{background:none;border:none;color:var(--chalk-dim);font-size:12px;text-decoration:underline;cursor:pointer;padding:0;width:auto;font-weight:400;margin-bottom:18px;}
+.change-name:hover{color:var(--floodlight);opacity:1;}
+
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(8,23,18,0.3);border-top-color:var(--ink);border-radius:50%;animation:spin 0.6s linear infinite;margin-right:6px;vertical-align:-2px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar">
+    <div class="logo-row"><span class="logo-ball">⚽</span><span class="logo-text">Login</span></div>
+    <nav class="site-nav">
+      <a href="index.html">Home</a>
+      <a href="anyday-football.html">Players</a>
+      <a href="anyday-match-archive.html">Match Archive</a>
+    </nav>
+  </header>
+
+  <div class="login-shell">
+    <h1 class="brand">Player <span>Login</span></h1>
+    <p class="tagline">Enter your name to sign in, or set a password for the first time.</p>
+
+    <div class="card">
+      <div id="step-name">
+        <label for="name-input">Your name</label>
+        <input type="text" id="name-input" list="known-names" placeholder="e.g. Asad" autocomplete="off">
+        <datalist id="known-names"></datalist>
+        <div id="name-msg"></div>
+        <button id="continue-btn">Continue</button>
+      </div>
+
+      <div id="step-signin" style="display:none;">
+        <button class="change-name" id="back-from-signin">&larr; not you?</button>
+        <div class="step-name" id="signin-name"></div>
+        <div class="hint">Welcome back. Enter your password.</div>
+        <div id="signin-msg"></div>
+        <label for="signin-password">Password</label>
+        <input type="password" id="signin-password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password">
+        <button id="signin-btn">Log in</button>
+      </div>
+
+      <div id="step-signup" style="display:none;">
+        <button class="change-name" id="back-from-signup">&larr; not you?</button>
+        <div class="step-name" id="signup-name"></div>
+        <div class="hint">No password set yet for this name — create one now. You'll use it to log in next time.</div>
+        <div id="signup-msg"></div>
+        <label for="signup-password">New password</label>
+        <input type="password" id="signup-password" placeholder="At least 6 characters" autocomplete="new-password">
+        <label for="signup-confirm">Confirm password</label>
+        <input type="password" id="signup-confirm" placeholder="Type it again" autocomplete="new-password">
+        <button id="signup-btn">Create account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://nszzhghwhevxcybzprlk.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_jSgeli_BnshhZwxeBkwTEQ_ccDXobfS';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Where a successful login/signup sends you — the player card gallery.
+const REDIRECT_TO = 'anyday-football.html';
+
+function slugify(name){
+  return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+function emailFor(name){
+  return `${slugify(name)}@anydayfootball.internal`;
+}
+function escapeHtml(s){
+  return (s||'').toString().replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+let KNOWN_NAMES = new Map(); // lowercase -> canonical-cased name
+let matchedName = null;      // the canonical name currently being logged in / signed up
+
+function setMsg(id, text, kind){
+  const el = document.getElementById(id);
+  if(!text){ el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="msg ${kind}">${escapeHtml(text)}</div>`;
+}
+
+function showStep(step){
+  document.getElementById('step-name').style.display = step==='name' ? '' : 'none';
+  document.getElementById('step-signin').style.display = step==='signin' ? '' : 'none';
+  document.getElementById('step-signup').style.display = step==='signup' ? '' : 'none';
+}
+
+async function loadKnownNames(){
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/match_players?select=name`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+      cache: 'no-store'
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const rows = await r.json();
+    const list = document.getElementById('known-names');
+    rows.forEach(row=>{
+      if(!row.name) return;
+      if(!KNOWN_NAMES.has(row.name.toLowerCase())){
+        KNOWN_NAMES.set(row.name.toLowerCase(), row.name);
+        const opt = document.createElement('option');
+        opt.value = row.name;
+        list.appendChild(opt);
+      }
+    });
+  } catch(e){
+    console.warn('Could not load player names — name matching will still work if typed exactly.', e);
+  }
+}
+
+async function handleContinue(){
+  const raw = document.getElementById('name-input').value.trim();
+  setMsg('name-msg', '', '');
+  if(!raw){ setMsg('name-msg', 'Enter your name first.', 'error'); return; }
+
+  const canonical = KNOWN_NAMES.get(raw.toLowerCase());
+  if(!canonical){
+    setMsg('name-msg', "We don't have a player by that name in the match archive yet — check the spelling, or ask in the group if you're new.", 'error');
+    return;
+  }
+
+  const btn = document.getElementById('continue-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Checking...';
+
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/player_profiles?name=eq.${encodeURIComponent(canonical)}&select=name`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+      cache: 'no-store'
+    });
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const rows = await r.json();
+    matchedName = canonical;
+
+    if(rows.length){
+      document.getElementById('signin-name').textContent = canonical;
+      setMsg('signin-msg', '', '');
+      showStep('signin');
+      document.getElementById('signin-password').focus();
+    } else {
+      document.getElementById('signup-name').textContent = canonical;
+      setMsg('signup-msg', '', '');
+      showStep('signup');
+      document.getElementById('signup-password').focus();
+    }
+  } catch(e){
+    setMsg('name-msg', "Couldn't reach the login system right now — try again in a moment.", 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Continue';
+  }
+}
+
+async function handleSignIn(){
+  const password = document.getElementById('signin-password').value;
+  if(!password){ setMsg('signin-msg', 'Enter your password.', 'error'); return; }
+
+  const btn = document.getElementById('signin-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Logging in...';
+  setMsg('signin-msg', '', '');
+
+  const { error } = await sb.auth.signInWithPassword({ email: emailFor(matchedName), password });
+
+  if(error){
+    setMsg('signin-msg', 'Wrong password — try again, or ask the group admin for your login code.', 'error');
+    btn.disabled = false; btn.textContent = 'Log in';
+    return;
+  }
+
+  setMsg('signin-msg', 'Logged in — taking you to your card...', 'success');
+  setTimeout(()=>{ location.href = REDIRECT_TO; }, 500);
+}
+
+async function handleSignUp(){
+  const password = document.getElementById('signup-password').value;
+  const confirm = document.getElementById('signup-confirm').value;
+  setMsg('signup-msg', '', '');
+
+  if(password.length < 6){ setMsg('signup-msg', 'Password needs to be at least 6 characters.', 'error'); return; }
+  if(password !== confirm){ setMsg('signup-msg', "Passwords don't match.", 'error'); return; }
+
+  const btn = document.getElementById('signup-btn');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Creating account...';
+
+  const { data, error } = await sb.auth.signUp({ email: emailFor(matchedName), password });
+
+  if(error){
+    setMsg('signup-msg', `Couldn't create your account: ${error.message}`, 'error');
+    btn.disabled = false; btn.textContent = 'Create account';
+    return;
+  }
+
+  if(!data.session){
+    // Only happens if "Confirm email" is still enabled in Supabase Auth settings — these are
+    // synthetic emails with no real inbox, so confirmation can never arrive. This needs to be
+    // turned off (Authentication -> Sign In / Providers -> Email -> Confirm email) for signup
+    // to work at all.
+    setMsg('signup-msg', "Account created, but couldn't finish setup automatically. Ask the group admin to check the login configuration.", 'error');
+    btn.disabled = false; btn.textContent = 'Create account';
+    return;
+  }
+
+  const { error: profileErr } = await sb.from('player_profiles').insert({ id: data.user.id, name: matchedName });
+  if(profileErr){
+    setMsg('signup-msg', `Account created, but there was a problem finishing setup (${profileErr.message}). Ask the group admin for help.`, 'error');
+    btn.disabled = false; btn.textContent = 'Create account';
+    return;
+  }
+
+  setMsg('signup-msg', 'Account created — taking you to your card...', 'success');
+  setTimeout(()=>{ location.href = REDIRECT_TO; }, 500);
+}
+
+function resetToNameStep(){
+  matchedName = null;
+  document.getElementById('signin-password').value = '';
+  document.getElementById('signup-password').value = '';
+  document.getElementById('signup-confirm').value = '';
+  setMsg('signin-msg', '', '');
+  setMsg('signup-msg', '', '');
+  showStep('name');
+  document.getElementById('name-input').focus();
+}
+
+document.getElementById('continue-btn').addEventListener('click', handleContinue);
+document.getElementById('name-input').addEventListener('keydown', e=>{ if(e.key==='Enter') handleContinue(); });
+document.getElementById('signin-btn').addEventListener('click', handleSignIn);
+document.getElementById('signin-password').addEventListener('keydown', e=>{ if(e.key==='Enter') handleSignIn(); });
+document.getElementById('signup-btn').addEventListener('click', handleSignUp);
+document.getElementById('signup-confirm').addEventListener('keydown', e=>{ if(e.key==='Enter') handleSignUp(); });
+document.getElementById('back-from-signin').addEventListener('click', resetToNameStep);
+document.getElementById('back-from-signup').addEventListener('click', resetToNameStep);
+
+// If already logged in, skip straight to the card gallery.
+sb.auth.getSession().then(({data})=>{
+  if(data.session){ location.href = REDIRECT_TO; }
+});
+
+loadKnownNames();
+</script>
+</body>
+</html>
