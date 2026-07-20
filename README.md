@@ -97,7 +97,7 @@ Logged-in players can set a favorite club and up to 3 favorite players/nations f
 
 ## Profile photo
 
-From the same panel, a player can upload a profile photo (JPG/PNG/WebP, up to 3MB) that replaces the generated initials avatar on the front of their card everywhere it appears — their own card and the public gallery. Photos are stored in a public Supabase Storage bucket (`avatars`), one file per player at a fixed path keyed by their own user id, so re-uploading always replaces rather than accumulates files. A player can only write to their own path — enforced by Storage RLS policies, not just the UI.
+From the same panel, a player can upload a profile photo (JPG/PNG/WebP, up to 15MB original) that replaces the generated initials avatar on the front of their card everywhere it appears — their own card and the public gallery. Before upload, the browser center-crops it to a square, resizes it to 480×480, and re-encodes it as JPEG, stepping the quality down until it's under 250KB — so what actually gets stored and downloaded by everyone viewing the gallery is always small, regardless of the original file. Photos are stored in a public Supabase Storage bucket (`avatars`), one file per player at a fixed path keyed by their own user id (always `avatar.jpg` now, since compression standardizes the format), so re-uploading always replaces rather than accumulates files. A player can only write to their own path — enforced by Storage RLS policies, not just the UI.
 
 ## Goals and assists
 

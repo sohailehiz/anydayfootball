@@ -813,7 +813,7 @@ function favoritesPanelHTML(name){
         <div class="avatar-edit-preview" id="avatar-preview">${avatarPreview}</div>
         <div class="avatar-edit-controls">
           <input id="avatar-file-input" type="file" accept="image/png,image/jpeg,image/webp">
-          <div class="sub" style="margin:4px 0 0;">JPG, PNG or WebP, up to 3MB.</div>
+          <div class="sub" style="margin:4px 0 0;">JPG, PNG or WebP — automatically resized and compressed to under 250KB.</div>
           <div id="avatar-upload-status" class="fav-save-status"></div>
         </div>
       </div>
@@ -862,7 +862,46 @@ async function handleSaveFavorites(){
   setTimeout(render, 900);
 }
 
-const AVATAR_MAX_BYTES = 3 * 1024 * 1024;
+// Original file just needs a sane upper bound before we bother trying to decode/compress it —
+// the real 250KB limit is enforced after compression, below.
+const AVATAR_MAX_BYTES = 15 * 1024 * 1024;
+const AVATAR_MAX_COMPRESSED_BYTES = 250 * 1024;
+const AVATAR_TARGET_SIZE = 480; // px, square — plenty for a ~100px circular card avatar even on retina
+
+function loadImageFromFile(file){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that image file.')); };
+    img.src = url;
+  });
+}
+
+// Center-crops to a square (the avatar displays as a circle via object-fit:cover anyway, so the
+// edges get clipped either way — cropping before upload avoids wasting bytes on parts of the
+// photo nobody will see), resizes down to AVATAR_TARGET_SIZE, then re-encodes as JPEG, stepping
+// the quality down until it's under AVATAR_MAX_COMPRESSED_BYTES (or hits a quality floor where
+// further compression isn't worth the visible artifacting).
+async function compressAvatarImage(file){
+  const img = await loadImageFromFile(file);
+  const side = Math.min(img.naturalWidth, img.naturalHeight);
+  const sx = (img.naturalWidth - side) / 2;
+  const sy = (img.naturalHeight - side) / 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = AVATAR_TARGET_SIZE;
+  canvas.height = AVATAR_TARGET_SIZE;
+  canvas.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, AVATAR_TARGET_SIZE, AVATAR_TARGET_SIZE);
+
+  let quality = 0.9;
+  let blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', quality));
+  while(blob && blob.size > AVATAR_MAX_COMPRESSED_BYTES && quality > 0.35){
+    quality -= 0.1;
+    blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', quality));
+  }
+  return blob;
+}
 
 async function handleAvatarUpload(e){
   const file = e.target.files && e.target.files[0];
@@ -875,19 +914,34 @@ async function handleAvatarUpload(e){
     return;
   }
   if(file.size > AVATAR_MAX_BYTES){
-    status.textContent = 'That image is too large — please pick one under 3MB.';
+    status.textContent = 'That image is too large — please pick a smaller file.';
+    e.target.value = '';
+    return;
+  }
+
+  status.textContent = 'Compressing...';
+  let blob;
+  try {
+    blob = await compressAvatarImage(file);
+  } catch(err){
+    status.textContent = "Couldn't process that image — try a different file.";
+    e.target.value = '';
+    return;
+  }
+  if(!blob){
+    status.textContent = "Couldn't process that image — try a different file.";
     e.target.value = '';
     return;
   }
 
   status.textContent = 'Uploading...';
-  const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
-  // Fixed path per user (upsert: true replaces it in place) — keeps storage tidy and matches the
-  // "self insert/update avatars" RLS policy, which requires the first path segment to be the
-  // uploader's own auth user id.
-  const path = `${currentSession.user.id}/avatar.${ext}`;
+  // Always .jpg now regardless of the original format, since compression re-encodes everything
+  // to JPEG. Fixed path per user (upsert: true replaces it in place) — keeps storage tidy and
+  // matches the "self insert/update avatars" RLS policy, which requires the first path segment
+  // to be the uploader's own auth user id.
+  const path = `${currentSession.user.id}/avatar.jpg`;
 
-  const { error: uploadErr } = await sb.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type });
+  const { error: uploadErr } = await sb.storage.from('avatars').upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
   if(uploadErr){
     status.textContent = `Upload failed: ${uploadErr.message}`;
     e.target.value = '';
