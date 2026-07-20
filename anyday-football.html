@@ -371,6 +371,8 @@ async function fetchFromSupabase(){
         if(row.guest_name) o.gn = row.guest_name;
         if(row.late_fee) o.l = 1;
         if(row.fee_amount != null) o.f = row.fee_amount;
+        if(row.goals) o.gs = row.goals;
+        if(row.assists) o.as = row.assists;
         return o;
       });
       const d = (m.match_dropouts||[]).map(row=>{
@@ -561,12 +563,19 @@ function allPlayerStats(){
   MATCHES.forEach(m=>{
     const names = [...new Set(m.p.map(p=>p.n))];
     names.forEach(n=>{
-      const s = map.get(n) || {name:n, count:0, first:m.date, last:m.date, byYear:new Map()};
+      const s = map.get(n) || {name:n, count:0, first:m.date, last:m.date, byYear:new Map(), goals:0, assists:0};
       s.count++;
       s.byYear.set(m.yr, (s.byYear.get(m.yr)||0)+1);
       if(m.date < s.first) s.first = m.date;
       if(m.date > s.last) s.last = m.date;
       map.set(n, s);
+    });
+    // Goals/assists (gs/as — see extractGoalsAssists in anyday-match-archive.html) aren't in use
+    // yet, so this sums to 0 for everyone today; wired up now so it's correct the moment a roster
+    // message actually includes them.
+    m.p.forEach(p=>{
+      const s = map.get(p.n);
+      if(s){ s.goals += (p.gs||0); s.assists += (p.as||0); }
     });
   });
   return [...map.values()].sort((a,b)=>b.count-a.count);
@@ -633,6 +642,8 @@ function cardBackHTML(s, overall, tier, ratings){
       <div class="card-back tier-${tier}">
         <div class="back-label">Season stats</div>
         <div class="back-row"><div class="bl">Games played</div><div class="bv">${s.count}</div><div class="bv-sub">${yearBreakdown(s.byYear)}</div></div>
+        <div class="back-row"><div class="bl">Goals</div><div class="bv">${s.goals}</div></div>
+        <div class="back-row"><div class="bl">Assists</div><div class="bv">${s.assists}</div></div>
         <div class="back-row"><div class="bl">Skill</div><div class="bv" style="font-size:13px;">${skillScore} <small>(${ratings && ratings.length ? `from ${ratings.length} rated match${ratings.length===1?'':'es'}` : 'not rated yet'})</small></div></div>
         <div class="back-row"><div class="bl">Favorite club</div><div class="bv" style="font-size:13px;">${fav.club || 'not set'}</div></div>
         <div class="back-row"><div class="bl">Top 3 players</div><div class="bv" style="font-size:13px;">${favPlayers}</div></div>

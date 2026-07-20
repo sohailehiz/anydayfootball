@@ -150,7 +150,9 @@ async function main() {
       guest_number: p.g ?? null,
       guest_name: p.gn || null,
       late_fee: !!p.l,
-      fee_amount: p.f ?? null
+      fee_amount: p.f ?? null,
+      goals: p.gs ?? 0,
+      assists: p.as ?? 0
     }));
     if (playerRows.length) {
       const { error: pErr } = await supabase.from('match_players').insert(playerRows);

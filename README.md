@@ -72,6 +72,7 @@ If you already have a running project and are just picking up new schema changes
 - **`migrate_profile_favorites.sql`** — adds `favorite_club`/`favorite_players`/`favorite_nations` to `player_profiles`.
 - **`migrate_stable_match_ids.sql`** — adds `source_key` to `matches` and a uniqueness constraint on it, so `seed.mjs` can upsert matches instead of wiping the table. Run this once if your project predates this fix (does not restore ratings already lost to a past reseed — only prevents future ones).
 - **`migrate_avatar.sql`** — adds `avatar_url` to `player_profiles` and sets up a public `avatars` Storage bucket with policies so a player can only upload/replace/delete their own photo.
+- **`migrate_goals_assists.sql`** — adds `goals`/`assists` counters to `match_players`. See "Goals and assists" below.
 
 Other scripts in `supabase/`:
 
@@ -96,6 +97,10 @@ Logged-in players can set a favorite club and up to 3 favorite players/nations f
 ## Profile photo
 
 From the same panel, a player can upload a profile photo (JPG/PNG/WebP, up to 3MB) that replaces the generated initials avatar on the front of their card everywhere it appears — their own card and the public gallery. Photos are stored in a public Supabase Storage bucket (`avatars`), one file per player at a fixed path keyed by their own user id, so re-uploading always replaces rather than accumulates files. A player can only write to their own path — enforced by Storage RLS policies, not just the UI.
+
+## Goals and assists
+
+The roster parser on the Add Match tab recognizes an optional `g<N>`/`a<N>` shorthand per player — e.g. `Sohail g2 a1` means 2 goals and 1 assist. Not currently used in the group's WhatsApp messages, so every player's total is 0 today, but it's fully wired up: parsed from pasted messages, editable by hand in the players field, carried through `seed.mjs` into `match_players.goals`/`match_players.assists`, totalled per player on the back of their card, and ranked in "Top 10 goal scorers" / "Top 10 assists" on the Analytics tab. Starts working the moment a roster message actually includes the tags — no further changes needed. Only applies to players who played; dropouts can't score.
 
 ## Notes
 

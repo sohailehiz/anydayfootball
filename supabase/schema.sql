@@ -35,7 +35,12 @@ create table if not exists match_players (
   guest_number int,           -- the "g" field: nth guest brought by this inviter
   guest_name text,            -- the "gn" field: guest's real name, if recorded
   late_fee boolean not null default false,
-  fee_amount int
+  fee_amount int,
+  -- Optional per-match stats, from the "gs"/"as" fields on each player entry (mirrors the
+  -- "g<N>"/"a<N>" WhatsApp roster shorthand — see extractGoalsAssists() in
+  -- anyday-match-archive.html). Not in use yet; defaults to 0 for every existing row.
+  goals int not null default 0 check (goals >= 0),
+  assists int not null default 0 check (assists >= 0)
 );
 
 -- Players who dropped out / no-showed (mirrors each match's "d" array)

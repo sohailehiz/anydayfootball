@@ -279,6 +279,8 @@ async function fetchFromSupabase(){
         if(row.guest_name) o.gn = row.guest_name;
         if(row.late_fee) o.l = 1;
         if(row.fee_amount != null) o.f = row.fee_amount;
+        if(row.goals) o.gs = row.goals;
+        if(row.assists) o.as = row.assists;
         return o;
       });
       const d = (m.match_dropouts||[]).map(row=>{
@@ -415,6 +417,21 @@ function renderAnalytics(){
   const avgArr = spendArr.map(([n,amt])=>[n, amt, pays.get(n)]).sort((a,b)=>b[2]-a[2]).slice(0,10);
   const avgMax = avgArr.length ? Math.max(...avgArr.map(x=>x[1])) : 1;
 
+  // Top 10 goal scorers / assists. Sourced from the optional "gs"/"as" fields on each player entry
+  // (the "g<N>"/"a<N>" WhatsApp roster shorthand — see extractGoalsAssists in the Add Match tab).
+  // Not in use by the group yet, so these are empty until a roster message actually includes it.
+  const goalsMap = new Map(), assistsMap = new Map();
+  list.forEach(m=>{
+    m.p.forEach(p=>{
+      if(p.gs) goalsMap.set(p.n, (goalsMap.get(p.n)||0) + p.gs);
+      if(p.as) assistsMap.set(p.n, (assistsMap.get(p.n)||0) + p.as);
+    });
+  });
+  const goalsArr = [...goalsMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const goalsMax = goalsArr.length ? Math.max(...goalsArr.map(x=>x[1])) : 1;
+  const assistsArr = [...assistsMap.entries()].sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const assistsMax = assistsArr.length ? Math.max(...assistsArr.map(x=>x[1])) : 1;
+
   // Location of games
   const byLoc = new Map();
   list.forEach(m=>{ const g = normalizeGround(m.loc); byLoc.set(g, (byLoc.get(g)||0)+1); });
@@ -506,6 +523,16 @@ function renderAnalytics(){
       return `<div class="row"><div class="name" style="flex:1.4;">${esc(n)}${isCurrent ? ' <span class="tag late">active</span>' : ''}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(longest/streakMax*100)}%"></div></div><div class="cnt">${longest}</div></div>`;
     }).join('') : '<div class="empty">Not enough data yet.</div>'}</div>
     <div class="form-hint" style="margin-top:8px;">Longest run of consecutive matches (within this scope) each player didn't miss. "Active" means it's still going as of the most recent match.</div>
+
+    <h3 style="margin:26px 2px 10px;font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Top 10 goal scorers</h3>
+    <div class="player-table">${goalsArr.length ? goalsArr.map(([n,c])=>{
+      return `<div class="row"><div class="name" style="flex:1.4;">${esc(n)}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(c/goalsMax*100)}%"></div></div><div class="cnt">${c}</div></div>`;
+    }).join('') : '<div class="empty">No goals recorded in this scope yet.</div>'}</div>
+
+    <h3 style="margin:26px 2px 10px;font-size:14px;color:var(--dim);text-transform:uppercase;letter-spacing:0.5px;">Top 10 assists</h3>
+    <div class="player-table">${assistsArr.length ? assistsArr.map(([n,c])=>{
+      return `<div class="row"><div class="name" style="flex:1.4;">${esc(n)}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.round(c/assistsMax*100)}%"></div></div><div class="cnt">${c}</div></div>`;
+    }).join('') : '<div class="empty">No assists recorded in this scope yet.</div>'}</div>
 
     ${estimatedCount>0 ? `<div class="empty" style="padding:10px 0;">${estimatedCount} game${estimatedCount===1?'':'s'} in this scope had no Total/Per Head posted in chat — assumed ₹${ESTIMATED_TOTAL} (split evenly per player).</div>` : ''}
   `;
@@ -605,9 +632,23 @@ Laya *"></textarea>
 
 const MONTH_LOOKUP = {jan:0,january:0,feb:1,february:1,mar:2,march:2,apr:3,april:3,may:4,jun:5,june:5,jul:6,july:6,aug:7,august:7,sep:8,sept:8,september:8,oct:9,october:9,nov:10,november:10,dec:11,december:11};
 
+// Goals/assists shorthand: a player line can optionally include "g<N>" and/or "a<N>" as
+// standalone words, e.g. "Sohail g2 a1" — not wired into the roster message yet (no group games
+// track this today), but ready for whenever they do. Deliberately doesn't reuse "g", since that
+// letter's already taken internally for guest_number — this only affects the raw chat shorthand,
+// which end users type but never see the underlying field names for anyway.
+function extractGoalsAssists(str){
+  let goals = 0, assists = 0;
+  let cleaned = str.replace(/\bg(\d+)\b/i, (_, n)=>{ goals = parseInt(n,10); return ''; });
+  cleaned = cleaned.replace(/\ba(\d+)\b/i, (_, n)=>{ assists = parseInt(n,10); return ''; });
+  return { cleaned: cleaned.replace(/\s+/g,' ').trim(), goals, assists };
+}
+
 // Parses a pasted WhatsApp roster message (the kind posted after every game — "Day and Date:",
 // "Time:", "Location:", "Total:", "Per Head:", then numbered Team A / Team B lists with ✅/✔/☑
 // checkmarks, <+50> late-fee tags, and <100>/<+100> drop-out tags) into structured fields.
+// Also recognizes an optional "g<N>"/"a<N>" goals/assists shorthand per player (see
+// extractGoalsAssists above) — currently unused by the group but parsed and preserved if present.
 function parseWhatsAppRoster(text){
   const result = { date: null, time: null, loc: null, total: null, perHead: null, players: [], dropouts: [], guestIssues: [] };
   const clean = text.replace(/[​⁠﻿]/g, ''); // strip invisible word-joiner/zero-width chars
@@ -672,9 +713,17 @@ function parseWhatsAppRoster(text){
     }
     if(!name) continue;
 
-    if(isDrop) result.dropouts.push(name);
-    else if(isLate) result.players.push(name + ' *');
-    else result.players.push(name);
+    if(isDrop){
+      result.dropouts.push(name);
+    } else {
+      // Goals/assists only apply to players who actually played, never dropouts.
+      const { cleaned, goals, assists } = extractGoalsAssists(name);
+      let line = cleaned;
+      if(goals) line += ` g${goals}`;
+      if(assists) line += ` a${assists}`;
+      if(isLate) line += ' *';
+      result.players.push(line);
+    }
   }
 
   return result;
@@ -693,8 +742,13 @@ function handleParsePaste(){
   // reach the textarea — only genuinely new lookalikes need the warning panel below.
   const normalizedPlayers = r.players.map(line=>{
     const isLate = /\*\s*$/.test(line);
-    const name = normalizeName(line.replace(/\*\s*$/,'').trim());
-    return isLate ? `${name} *` : name;
+    const rest = line.replace(/\*\s*$/,'').trim();
+    const { cleaned, goals, assists } = extractGoalsAssists(rest);
+    let out = normalizeName(cleaned);
+    if(goals) out += ` g${goals}`;
+    if(assists) out += ` a${assists}`;
+    if(isLate) out += ' *';
+    return out;
   });
   const normalizedDropouts = r.dropouts.map(name=>normalizeName(name.trim()));
   if(normalizedPlayers.length) document.getElementById('add-players').value = normalizedPlayers.join('\n');
@@ -768,7 +822,7 @@ function refreshNameWarnings(){
   const playersText = document.getElementById('add-players')?.value || '';
   const dropoutsText = document.getElementById('add-dropouts')?.value || '';
   const candidates = [
-    ...playersText.split('\n').map(l=>l.replace(/\*\s*$/,'').trim()),
+    ...playersText.split('\n').map(l=>extractGoalsAssists(l.replace(/\*\s*$/,'').trim()).cleaned),
     ...dropoutsText.split('\n').map(l=>l.replace(/:\s*\d+$/,'').trim())
   ].filter(Boolean);
   const warnings = findNameWarnings(candidates).filter(w=>!DISMISSED_NAME_WARNINGS.has(w.input.toLowerCase()));
@@ -799,25 +853,43 @@ function refreshNameWarnings(){
 // Rewrites a single name in-place within the players/dropouts textareas, preserving any trailing
 // "*" (late fee) or ":fee" (dropout fee) suffix on that line.
 function applyNameFix(from, to){
-  ['add-players','add-dropouts'].forEach(id=>{
-    const el = document.getElementById(id);
-    if(!el) return;
-    el.value = el.value.split('\n').map(line=>{
-      const suffixMatch = line.match(/(\*\s*|:\s*\d+)$/);
+  const playersEl = document.getElementById('add-players');
+  if(playersEl){
+    playersEl.value = playersEl.value.split('\n').map(line=>{
+      const late = /\*\s*$/.test(line);
+      const rest = line.replace(/\*\s*$/,'').trim();
+      const { cleaned, goals, assists } = extractGoalsAssists(rest);
+      if(cleaned.toLowerCase() !== from.toLowerCase()) return line;
+      let fixed = to;
+      if(goals) fixed += ` g${goals}`;
+      if(assists) fixed += ` a${assists}`;
+      if(late) fixed += ' *';
+      return fixed;
+    }).join('\n');
+  }
+  const dropoutsEl = document.getElementById('add-dropouts');
+  if(dropoutsEl){
+    dropoutsEl.value = dropoutsEl.value.split('\n').map(line=>{
+      const suffixMatch = line.match(/:\s*\d+$/);
       const suffix = suffixMatch ? suffixMatch[0] : '';
       const bare = suffix ? line.slice(0, line.length - suffix.length).trim() : line.trim();
       return bare.toLowerCase() === from.toLowerCase() ? to + (suffix ? ' ' + suffix.trim() : '') : line;
     }).join('\n');
-  });
+  }
   refreshNameWarnings();
 }
 
 function parsePlayersInput(text){
   return text.split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{
     const late = /\*\s*$/.test(line);
-    const name = line.replace(/\*\s*$/,'').trim();
-    const obj = {n: name};
+    const rest = line.replace(/\*\s*$/,'').trim();
+    // Goals/assists shorthand (see extractGoalsAssists) — not in use yet, but if a "g<N>"/"a<N>"
+    // token is present, this is where it ends up on the stored match object as gs/as.
+    const { cleaned, goals, assists } = extractGoalsAssists(rest);
+    const obj = {n: cleaned};
     if(late){ obj.l = 1; obj.f = 50; }
+    if(goals) obj.gs = goals;
+    if(assists) obj.as = assists;
     return obj;
   });
 }
