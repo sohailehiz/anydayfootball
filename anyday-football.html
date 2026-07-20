@@ -361,8 +361,12 @@ async function fetchFromSupabase(){
     if(!Array.isArray(rawMatches) || !rawMatches.length) throw new Error('Empty Supabase matches response');
 
     const matches = rawMatches.map(m=>{
+      // Use the already-normalized "name" column (what seed.mjs writes after applying
+      // player-aliases.json), not "raw_name" (the original as-typed spelling kept only for
+      // audit). loadData() also re-applies normalizeName() on top of this below, so a brand-new
+      // alias still takes effect immediately on the live site even before the next reseed.
       const p = (m.match_players||[]).map(row=>{
-        const o = { n: row.raw_name };
+        const o = { n: row.name };
         if(row.is_guest) o.g = row.guest_number;
         if(row.guest_name) o.gn = row.guest_name;
         if(row.late_fee) o.l = 1;
@@ -370,7 +374,7 @@ async function fetchFromSupabase(){
         return o;
       });
       const d = (m.match_dropouts||[]).map(row=>{
-        const o = { n: row.raw_name };
+        const o = { n: row.name };
         if(row.fee_amount != null) o.f = row.fee_amount;
         return o;
       });
@@ -446,7 +450,15 @@ async function loadData(){
   if(fromSupabase){
     PLAYER_ALIASES = fromSupabase.aliases;
     ALIAS_MAP = buildAliasMap(PLAYER_ALIASES);
-    MATCHES = fromSupabase.matches;
+    // Re-apply alias normalization client-side too (belt-and-suspenders with the "name" column
+    // already being normalized server-side) — this was previously missing here, which meant no
+    // alias merge (Kush/Kushal, Anushree/Anush, Kewel/Kewal, Iccha/Ichha) ever actually applied
+    // on the live Supabase-backed pages, even after a successful reseed.
+    MATCHES = fromSupabase.matches.map(m=>({
+      ...m,
+      p: m.p.map(p=>({...p, n: normalizeName(p.n)})),
+      d: (m.d||[]).map(d=>({...d, n: normalizeName(d.n)}))
+    }));
     dataSource = 'supabase';
     RATINGS_BY_NAME = await fetchAllRatings();
     FAVORITES_BY_NAME = await fetchAllFavorites();
