@@ -70,8 +70,6 @@ create table if not exists player_aliases (
 create table if not exists player_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   name text not null unique,
-  stamina int not null default 50 check (stamina between 1 and 99),
-  speed int not null default 50 check (speed between 1 and 99),
   claimed_at timestamptz not null default now(),
   -- Freely editable cosmetic preferences, capped at 3 each — no lock, unlike match_ratings.
   favorite_club text,

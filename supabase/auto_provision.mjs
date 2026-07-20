@@ -3,9 +3,10 @@
 // Finds every player from players_missing_account (regulars — more than 3 games played — who
 // don't have a player_profiles row yet, per supabase/auto_provision.sql) and creates a real
 // login for each: a synthetic email (name@anydayfootball.internal) and a random password,
-// using the Auth Admin API. This is the same logic the scheduled Edge Function will eventually
-// run automatically — for now it's a script you run by hand whenever you want to catch up any
-// new regulars.
+// using the Auth Admin API. This is the same logic the scheduled Edge Function
+// (functions/auto-provision-players) already runs automatically every 4 days via pg_cron — this
+// script exists so you can run the same thing by hand on demand instead of waiting for the
+// schedule (e.g. right after adding a batch of new regulars).
 //
 // Setup (same as seed.mjs — if you already ran that, this reuses the same supabase/.env):
 //   cd supabase

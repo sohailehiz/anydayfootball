@@ -71,8 +71,6 @@ header.topbar{
 .logo-row{display:flex;align-items:center;gap:10px;}
 .logo-ball{font-size:22px;}
 .logo-text{font-family:'Anton',sans-serif;font-size:20px;letter-spacing:0.5px;}
-a.back-link{color:var(--chalk-dim);font-size:13px;text-decoration:none;border:1px solid var(--line);padding:6px 14px;border-radius:20px;}
-a.back-link:hover{border-color:var(--floodlight);color:var(--floodlight);}
 .site-nav{display:flex;gap:8px;}
 .site-nav a{color:var(--chalk-dim);font-size:13px;text-decoration:none;border:1px solid var(--line);padding:6px 14px;border-radius:20px;}
 .site-nav a:hover{border-color:var(--floodlight);color:var(--floodlight);}
@@ -179,8 +177,6 @@ input#search::placeholder{color:var(--chalk-dim);}
   transform:translateX(-120%);
   pointer-events:none;
 }
-.fifa-card.shine::before{animation:sheen 1.1s ease;}
-@keyframes sheen{to{transform:translateX(120%);}}
 .card-top{display:flex;justify-content:space-between;align-items:flex-start;position:relative;z-index:2;}
 .card-rating{font-family:'Anton',sans-serif;font-size:36px;line-height:0.85;color:var(--ink);}
 .card-stars{font-size:11px;color:var(--ink);margin-top:2px;letter-spacing:1px;}
@@ -969,7 +965,7 @@ function render(){
       <p class="tagline">FIFA-style cards, generated automatically from the match archive. Anyone who's played more than once gets a card.</p>
 
       <div class="login-note">
-        <b>Editing coming soon.</b> You can now <a href="login.html" style="color:var(--floodlight);">log in</a> if you're a regular player, but self-rating speed/stamina and editing your own card isn't built yet. Ratings are calculated purely from attendance (games played ÷ 52 weeks), with speed and stamina held at a flat 50 until self-ratings exist.
+        <b>These are your cards.</b> <a href="login.html" style="color:var(--floodlight);">Log in</a> if you're a regular player to rate your own games (stamina/passing/speed/dribbling), set a favorite club/players/nations, and upload a profile photo. Overall rating = 30% attendance (this year's games played ÷ this year's total games) + 70% self-rated skill, averaged across every match you've rated — unrated matches count as a flat 30 skill score.
       </div>
 
       <div class="controls-row">

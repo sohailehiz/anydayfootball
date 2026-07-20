@@ -59,6 +59,11 @@ table{width:100%;border-collapse:collapse;}
 .player-table .bar-track{flex:2;background:rgba(255,255,255,0.06);border-radius:6px;height:8px;margin:0 12px;overflow:hidden;}
 .player-table .bar-fill{height:100%;background:linear-gradient(90deg,var(--mid),var(--gold));}
 .player-table .cnt{width:34px;text-align:right;font-family:monospace;font-size:13px;color:var(--dim);}
+.player-table .ga-stat{width:28px;text-align:right;font-family:monospace;font-size:13px;color:var(--dim);}
+.player-table .row.ga-header{cursor:default;padding-top:0;padding-bottom:6px;border-bottom:1px solid var(--line);}
+.player-table .row.ga-header .cnt,
+.player-table .row.ga-header .ga-stat{font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--dim);font-family:inherit;}
+.player-table .row.ga-header:hover{background:none;}
 .note{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 18px;font-size:12.5px;color:var(--dim);line-height:1.6;margin-top:26px;}
 .note b{color:var(--text);}
 .player-detail{margin-top:6px;font-size:12.5px;color:var(--dim);}
@@ -1053,20 +1058,48 @@ function renderMatches(){
   return list.map(matchCard).join('');
 }
 
+// Goals/assists per player, in the same year/group scope as playerCounts() above. Sourced from
+// the optional "gs"/"as" fields (the "g<N>"/"a<N>" WhatsApp roster shorthand) — not in use by the
+// group yet, so this returns all zeros until a roster message actually includes it.
+function playerGoalsAssists(){
+  const g = new Map(), a = new Map();
+  for(const match of scopedByYearGroup()){
+    match.p.forEach(p=>{
+      if(p.gs) g.set(p.n, (g.get(p.n)||0) + p.gs);
+      if(p.as) a.set(p.n, (a.get(p.n)||0) + p.as);
+    });
+  }
+  return { g, a };
+}
+
 function renderPlayers(){
   const counts = playerCounts();
   const dcounts = dropoutCounts();
+  const { g: goalsMap, a: assistsMap } = playerGoalsAssists();
   const q = state.search.trim().toLowerCase();
   const filtered = q ? counts.filter(([n])=>n.toLowerCase().includes(q)) : counts;
   const max = counts.length ? counts[0][1] : 1;
   if(!filtered.length) return '<div class="empty">No players found.</div>';
-  return `<div class="player-table">` + filtered.map(([n,c],i)=>{
+  return `<div class="player-table">
+    <div class="row ga-header">
+      <div class="rank"></div>
+      <div class="name"></div>
+      <div class="bar-track"></div>
+      <div class="cnt" title="Games played">GP</div>
+      <div class="ga-stat" title="Goals">G</div>
+      <div class="ga-stat" title="Assists">A</div>
+    </div>
+    ` + filtered.map(([n,c],i)=>{
     const dc = dcounts.get(n);
+    const goals = goalsMap.get(n) || 0;
+    const assists = assistsMap.get(n) || 0;
     return `<div class="row" data-player="${esc(n)}">
       <div class="rank">${i+1}</div>
       <div class="name">${esc(n)}${dc ? ` <span class="tag ns">dropped out ${dc}x</span>` : ''}</div>
       <div class="bar-track"><div class="bar-fill" style="width:${Math.round(c/max*100)}%"></div></div>
       <div class="cnt">${c}</div>
+      <div class="ga-stat">${goals}</div>
+      <div class="ga-stat">${assists}</div>
     </div>`;
   }).join('') + `</div>`;
 }
