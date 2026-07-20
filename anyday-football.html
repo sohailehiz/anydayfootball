@@ -489,12 +489,21 @@ async function loadData(){
 }
 
 /* ============ Rating math ============
-   Overall blends two independent scores: attendance (objective, from real match data) and skill
-   (subjective, self-rated after each match — stamina/passing/speed/dribbling, 1-10 each). Skill
-   is weighted higher (70/30) since that's the actual point of self-rating, but a player who
-   hasn't rated any matches yet gets a flat default skill score of 30 rather than 0, so a brand
-   new account isn't crushed to the bottom of the tier list before they've had a chance to rate
-   themselves even once. */
+   Overall blends two independent scores: attendance (objective, from real match data — 30%) and
+   skill (70%). Skill is normally just the 4 self-rated stats (stamina/passing/speed/dribbling,
+   1-10 per match, averaged across every match a player has rated) — but once the group starts
+   recording goals/assists (see extractGoalsAssists in anyday-match-archive.html), a 5th
+   goals/assists score (see computeGoalsAssistsScore) joins the blend as an equally-weighted stat.
+   Goals/assists is objective (like attendance) rather than subjective (like the self-rated 4),
+   but it lives inside the skill blend rather than as its own top-level component, since "how good
+   you are on the pitch" is the more natural home for it than "how often you show up".
+   A player who hasn't rated any matches yet gets a flat default skill score of 30 rather than 0
+   for the self-rated half. Goals/assists is handled differently: it's left out of the blend
+   entirely (not defaulted to 30) until at least one player in the group has actually recorded a
+   goal or assist — a flat default here would quietly drag every single player's rating down the
+   moment this shipped, purely from an untracked metric nobody's had a chance to use yet. Once
+   real data exists, computeGoalsAssistsScore takes over and someone with genuinely zero goals/
+   assists that year will correctly score low, same as intended. */
 const ATTENDANCE_WEIGHT = 0.3;
 const SKILL_WEIGHT = 0.7;
 const DEFAULT_SKILL_SCORE = 30;
@@ -508,16 +517,39 @@ function computeAttendanceScore(gamesPlayed, totalGames){
 function getCurrentYear(){
   return String(new Date().getFullYear());
 }
-// ratings: array of {stamina,passing,speed,dribbling}, each 1-10 — one entry per rated match.
-function computeSkillScore(ratings){
-  if(!ratings || !ratings.length) return DEFAULT_SKILL_SCORE;
-  const perMatchAvg = ratings.map(r => (r.stamina + r.passing + r.speed + r.dribbling) / 4);
-  const overallAvg = perMatchAvg.reduce((a,b)=>a+b, 0) / perMatchAvg.length;
-  return Math.max(1, Math.min(99, Math.round((overallAvg / 10) * 99)));
+// Converts a player's combined goals+assists (this year) into a 0-99 score, relative to whoever
+// has the most this year (topTotal) — so it auto-scales whether the group's games are low- or
+// high-scoring, with no arbitrary ceiling to guess at. Returns null (not a default 30) while
+// nobody in the group has tracked any goals/assists yet — see computeSkillScore for why that
+// distinction matters: a flat default here would quietly drag every single player's rating down
+// the moment this shipped, purely from an untracked metric, before anyone had a chance to log a
+// goal. A per-player "you didn't rate this stat" default is fair; a group-wide "nobody's used
+// this feature yet" default isn't, so this stays out of the blend entirely until it's real.
+function computeGoalsAssistsScore(goals, assists, topTotal){
+  if(!topTotal) return null;
+  return Math.max(1, Math.min(99, Math.round(((goals + assists) / topTotal) * 99)));
 }
-function computeOverall(gamesPlayed, totalGames, ratings){
+// ratings: array of {stamina,passing,speed,dribbling}, each 1-10 — one entry per rated match.
+// goalsAssistsScore: 0-99 from computeGoalsAssistsScore, or null if nobody's tracked any yet —
+// counts as a 5th equally-weighted stat only once it's non-null.
+function computeSkillScore(ratings, goalsAssistsScore){
+  let selfRated;
+  if(!ratings || !ratings.length){
+    selfRated = DEFAULT_SKILL_SCORE;
+  } else {
+    const perMatchAvg = ratings.map(r => (r.stamina + r.passing + r.speed + r.dribbling) / 4);
+    const overallAvg = perMatchAvg.reduce((a,b)=>a+b, 0) / perMatchAvg.length;
+    selfRated = Math.max(1, Math.min(99, Math.round((overallAvg / 10) * 99)));
+  }
+  if(goalsAssistsScore == null) return selfRated;
+  // selfRated is already the average of 4 equally-weighted stats, so weighting it 4:1 against
+  // goalsAssistsScore reproduces "5 equally-weighted stats overall" without having to fold
+  // goals/assists into the per-match rating average by hand.
+  return Math.max(1, Math.min(99, Math.round((selfRated * 4 + goalsAssistsScore) / 5)));
+}
+function computeOverall(gamesPlayed, totalGames, ratings, goalsAssistsScore){
   const attendanceScore = computeAttendanceScore(gamesPlayed, totalGames);
-  const skillScore = computeSkillScore(ratings);
+  const skillScore = computeSkillScore(ratings, goalsAssistsScore);
   return Math.max(1, Math.min(99, Math.round(attendanceScore * ATTENDANCE_WEIGHT + skillScore * SKILL_WEIGHT)));
 }
 function computeStars(overall){
@@ -559,7 +591,7 @@ function allPlayerStats(){
   MATCHES.forEach(m=>{
     const names = [...new Set(m.p.map(p=>p.n))];
     names.forEach(n=>{
-      const s = map.get(n) || {name:n, count:0, first:m.date, last:m.date, byYear:new Map(), goals:0, assists:0};
+      const s = map.get(n) || {name:n, count:0, first:m.date, last:m.date, byYear:new Map(), goals:0, assists:0, goalsByYear:new Map(), assistsByYear:new Map()};
       s.count++;
       s.byYear.set(m.yr, (s.byYear.get(m.yr)||0)+1);
       if(m.date < s.first) s.first = m.date;
@@ -568,10 +600,13 @@ function allPlayerStats(){
     });
     // Goals/assists (gs/as — see extractGoalsAssists in anyday-match-archive.html) aren't in use
     // yet, so this sums to 0 for everyone today; wired up now so it's correct the moment a roster
-    // message actually includes them.
+    // message actually includes them. Tracked by year too — the rating formula scores goals/
+    // assists relative to this year's top scorer, same "resets each season" spirit as attendance.
     m.p.forEach(p=>{
       const s = map.get(p.n);
-      if(s){ s.goals += (p.gs||0); s.assists += (p.as||0); }
+      if(!s) return;
+      if(p.gs){ s.goals += p.gs; s.goalsByYear.set(m.yr, (s.goalsByYear.get(m.yr)||0)+p.gs); }
+      if(p.as){ s.assists += p.as; s.assistsByYear.set(m.yr, (s.assistsByYear.get(m.yr)||0)+p.as); }
     });
   });
   return [...map.values()].sort((a,b)=>b.count-a.count);
@@ -585,6 +620,18 @@ function playerStats(){
 function yearBreakdown(byYear){
   return [...byYear.entries()].sort((a,b)=>b[0].localeCompare(a[0])).map(([y,c])=>`${y}: ${c}`).join(' &middot; ');
 }
+// Whoever has the most combined goals+assists this year, across everyone — the denominator
+// computeGoalsAssistsScore scales everyone else against. Computed once per render pass (not per
+// card) so it's consistent across the whole gallery and cheap regardless of player count.
+function topGoalsAssistsThisYear(){
+  const currentYear = getCurrentYear();
+  let top = 0;
+  allPlayerStats().forEach(s=>{
+    const total = (s.goalsByYear.get(currentYear)||0) + (s.assistsByYear.get(currentYear)||0);
+    if(total > top) top = total;
+  });
+  return top;
+}
 
 /* ============ Card rendering ============ */
 // Individual stat display is scaled the same way the overall skill score is (1-10 raw input ->
@@ -595,7 +642,7 @@ function avgStatScaled(ratings, key){
   return Math.max(1, Math.min(99, Math.round((avg/10)*99)));
 }
 
-function cardFrontHTML(s, overall, tier, stars, rank, ratings){
+function cardFrontHTML(s, overall, tier, stars, rank, ratings, gaScore){
   const fav = FAVORITES_BY_NAME.get(s.name);
   const avatarInner = fav && fav.avatarUrl
     ? `<img src="${escapeHtml(fav.avatarUrl)}" alt="${escapeHtml(s.name)}">`
@@ -619,6 +666,7 @@ function cardFrontHTML(s, overall, tier, stars, rank, ratings){
           <div><span>PAS</span><b>${avgStatScaled(ratings,'passing')}</b></div>
           <div><span>SPD</span><b>${avgStatScaled(ratings,'speed')}</b></div>
           <div><span>DRI</span><b>${avgStatScaled(ratings,'dribbling')}</b></div>
+          <div><span>G/A</span><b>${gaScore == null ? '—' : gaScore}</b></div>
           <div><span>GP</span><b>${yearGamesPlayed}</b></div>
           <div><span>OVR</span><b>${overall}</b></div>
         </div>
@@ -628,8 +676,8 @@ function cardFrontHTML(s, overall, tier, stars, rank, ratings){
     </div>
   `;
 }
-function cardBackHTML(s, overall, tier, ratings){
-  const skillScore = computeSkillScore(ratings);
+function cardBackHTML(s, overall, tier, ratings, gaScore){
+  const skillScore = computeSkillScore(ratings, gaScore);
   const fav = FAVORITES_BY_NAME.get(s.name) || { club: null, players: [], nations: [] };
   const favPlayers = (fav.players && fav.players.length) ? fav.players.filter(Boolean).join(', ') : 'not set';
   const favNations = (fav.nations && fav.nations.length) ? fav.nations.filter(Boolean).join(', ') : 'not set';
@@ -640,7 +688,7 @@ function cardBackHTML(s, overall, tier, ratings){
         <div class="back-row"><div class="bl">Games played</div><div class="bv">${s.count}</div><div class="bv-sub">${yearBreakdown(s.byYear)}</div></div>
         <div class="back-row"><div class="bl">Goals</div><div class="bv">${s.goals}</div></div>
         <div class="back-row"><div class="bl">Assists</div><div class="bv">${s.assists}</div></div>
-        <div class="back-row"><div class="bl">Skill</div><div class="bv" style="font-size:13px;">${skillScore} <small>(${ratings && ratings.length ? `from ${ratings.length} rated match${ratings.length===1?'':'es'}` : 'not rated yet'})</small></div></div>
+        <div class="back-row"><div class="bl">Skill</div><div class="bv" style="font-size:13px;">${skillScore} <small>(${ratings && ratings.length ? `from ${ratings.length} rated match${ratings.length===1?'':'es'}` : 'not rated yet'}${gaScore == null ? '' : ' + goals/assists'})</small></div></div>
         <div class="back-row"><div class="bl">Favorite club</div><div class="bv" style="font-size:13px;">${fav.club || 'not set'}</div></div>
         <div class="back-row"><div class="bl">Top 3 players</div><div class="bv" style="font-size:13px;">${favPlayers}</div></div>
         <div class="back-row"><div class="bl">Top 3 nations</div><div class="bv" style="font-size:13px;">${favNations}</div></div>
@@ -649,19 +697,22 @@ function cardBackHTML(s, overall, tier, ratings){
     </div>
   `;
 }
-function cardHTML(s, rank){
+function cardHTML(s, rank, topGA){
   const ratings = RATINGS_BY_NAME.get(s.name) || [];
   const currentYear = getCurrentYear();
   const yearGamesPlayed = s.byYear.get(currentYear) || 0;
   const yearTotalGames = MATCHES.filter(m=>m.yr===currentYear).length;
-  const overall = computeOverall(yearGamesPlayed, yearTotalGames, ratings);
+  const yearGoals = s.goalsByYear.get(currentYear) || 0;
+  const yearAssists = s.assistsByYear.get(currentYear) || 0;
+  const gaScore = computeGoalsAssistsScore(yearGoals, yearAssists, topGA);
+  const overall = computeOverall(yearGamesPlayed, yearTotalGames, ratings, gaScore);
   const tier = computeTier(overall);
   const stars = computeStars(overall);
   return `
     <div class="flip-wrap" data-flip>
       <div class="flip-inner">
-        ${cardFrontHTML(s, overall, tier, stars, rank, ratings)}
-        ${cardBackHTML(s, overall, tier, ratings)}
+        ${cardFrontHTML(s, overall, tier, stars, rank, ratings, gaScore)}
+        ${cardBackHTML(s, overall, tier, ratings, gaScore)}
       </div>
     </div>
   `;
@@ -715,12 +766,12 @@ function renderMyCard(){
       <p class="tagline">This is your card. <a href="anyday-football.html?all=1" style="color:var(--floodlight);">View all players &rarr;</a></p>
 
       <div class="login-note">
-        <b>Rating formula:</b> overall = 30% attendance (this year's games played &divide; this year's total games) + 70% skill (your self-rated stamina/passing/speed/dribbling, averaged across every match you've rated). Unrated matches count as a flat 30 skill score until you rate at least one, and attendance resets each calendar year.
+        <b>Rating formula:</b> overall = 30% attendance (this year's games played &divide; this year's total games) + 70% skill. Skill blends your self-rated stamina/passing/speed/dribbling (averaged across every match you've rated, flat 30 until you rate at least one) with a goals/assists score once the group starts tracking them (this year's combined goals+assists, relative to whoever has the most) — until then, skill is just the 4 self-rated stats. Both attendance and goals/assists reset each calendar year.
       </div>
 
       <div class="card-and-favorites">
         <div class="card-grid" style="justify-content:flex-start;">
-          ${cardHTML(s, allPlayerStats().findIndex(p=>p.name===s.name)+1)}
+          ${cardHTML(s, allPlayerStats().findIndex(p=>p.name===s.name)+1, topGoalsAssistsThisYear())}
         </div>
         ${favoritesPanelHTML(s.name)}
       </div>
@@ -954,6 +1005,7 @@ function render(){
   const stats = playerStats();
   const q = searchTerm.trim().toLowerCase();
   const filtered = q ? stats.filter(s=>s.name.toLowerCase().includes(q)) : stats;
+  const topGA = topGoalsAssistsThisYear();
 
   document.getElementById('app').innerHTML = `
     <div class="wrap">
@@ -965,7 +1017,7 @@ function render(){
       <p class="tagline">FIFA-style cards, generated automatically from the match archive. Anyone who's played more than once gets a card.</p>
 
       <div class="login-note">
-        <b>These are your cards.</b> <a href="login.html" style="color:var(--floodlight);">Log in</a> if you're a regular player to rate your own games (stamina/passing/speed/dribbling), set a favorite club/players/nations, and upload a profile photo. Overall rating = 30% attendance (this year's games played ÷ this year's total games) + 70% self-rated skill, averaged across every match you've rated — unrated matches count as a flat 30 skill score.
+        <b>These are your cards.</b> <a href="login.html" style="color:var(--floodlight);">Log in</a> if you're a regular player to rate your own games (stamina/passing/speed/dribbling), set a favorite club/players/nations, and upload a profile photo. Overall rating = 30% attendance (this year's games played ÷ this year's total games) + 70% skill (self-rated stats, plus goals/assists once the group starts tracking them) — anything not yet tracked counts as a flat 30.
       </div>
 
       <div class="controls-row">
@@ -974,7 +1026,7 @@ function render(){
       </div>
 
       <div class="card-grid">
-        ${filtered.length ? filtered.map((s,i)=>cardHTML(s, i+1)).join('') : `<div class="empty-state" style="grid-column:1/-1;"><div class="big">🏟️</div>No players match that search.</div>`}
+        ${filtered.length ? filtered.map((s,i)=>cardHTML(s, i+1, topGA)).join('') : `<div class="empty-state" style="grid-column:1/-1;"><div class="big">🏟️</div>No players match that search.</div>`}
       </div>
 
       <footer class="tag">${dataSource==='offline' ? 'Offline snapshot — open via the hosted GitHub Pages URL for live data.' : `${stats.length} players with 2+ games · generated from the match archive`}</footer>

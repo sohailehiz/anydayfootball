@@ -85,8 +85,9 @@ Other scripts in `supabase/`:
 
 Overall rating = 30% attendance + 70% skill, clamped to 1–99:
 
-- **Attendance score** = `games played ÷ total games ever recorded`, scaled to 0–99.
+- **Attendance score** = `this year's games played ÷ this year's total games recorded`, scaled to 0–99. Resets every calendar year rather than accumulating forever.
 - **Skill score** = average of self-rated stamina/passing/speed/dribbling across every match a player has rated, scaled from 1–10 to 0–99. Defaults to a flat 30 until a player rates at least one match — not 0, so an unrated regular isn't penalized as if they have no skill at all.
+- **Goals/assists** join the skill score as a 5th equally-weighted stat once the group actually starts tracking them (see "Goals and assists" below) — scored relative to whoever has the most combined goals+assists that year. Deliberately left out of the blend entirely (not defaulted to 30) until real data exists, so introducing this feature doesn't quietly lower everyone's rating before anyone's had a chance to use it.
 
 Ratings are self-only (no peer rating), and only offered for matches from 2026-07-19 onward — there's no retroactive demand to rate the whole archive. A rating can be corrected once after the initial save; after that the row locks at the database level (RLS), not just in the UI.
 
@@ -100,7 +101,7 @@ From the same panel, a player can upload a profile photo (JPG/PNG/WebP, up to 3M
 
 ## Goals and assists
 
-The roster parser on the Add Match tab recognizes an optional `g<N>`/`a<N>` shorthand per player — e.g. `Sohail g2 a1` means 2 goals and 1 assist. Not currently used in the group's WhatsApp messages, so every player's total is 0 today, but it's fully wired up: parsed from pasted messages, editable by hand in the players field, carried through `seed.mjs` into `match_players.goals`/`match_players.assists`, totalled per player on the back of their card, and ranked in "Top 10 goal scorers" / "Top 10 assists" on the Analytics tab. Starts working the moment a roster message actually includes the tags — no further changes needed. Only applies to players who played; dropouts can't score.
+The roster parser on the Add Match tab recognizes an optional `g<N>`/`a<N>` shorthand per player — e.g. `Sohail g2 a1` means 2 goals and 1 assist. Not currently used in the group's WhatsApp messages, so every player's total is 0 today, but it's fully wired up: parsed from pasted messages, editable by hand in the players field, carried through `seed.mjs` into `match_players.goals`/`match_players.assists`, totalled per player on the back of their card and in the Players tab, ranked in "Top 10 goal scorers" / "Top 10 assists" on the Analytics tab, and folded into the overall rating formula (see "Player ratings" above) once real data exists. Starts working the moment a roster message actually includes the tags — no further changes needed. Only applies to players who played; dropouts can't score.
 
 ## Notes
 
