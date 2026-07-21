@@ -2,5 +2,6 @@
   {"alias": "Kush", "canonical": "Kushal", "note": "Same person, name recorded inconsistently across WhatsApp rosters", "merged": "2026-07-19"},
   {"alias": "Anushree", "canonical": "Anush", "note": "Same person, name recorded inconsistently across WhatsApp rosters", "merged": "2026-07-19"},
   {"alias": "Kewel", "canonical": "Kewal", "note": "Same person, name recorded inconsistently across WhatsApp rosters", "merged": "2026-07-19"},
-  {"alias": "Iccha", "canonical": "Ichha", "note": "Same person — Ichha is the established spelling (21 past matches), Iccha was a one-off typo in the 2026-07-19 match, blocking her from rating that game under her real account", "merged": "2026-07-19"}
+  {"alias": "Iccha", "canonical": "Ichha", "note": "Same person — Ichha is the established spelling (21 past matches), Iccha was a one-off typo in the 2026-07-19 match, blocking her from rating that game under her real account", "merged": "2026-07-19"},
+  {"alias": "Subhankar", "canonical": "Shubhankar", "note": "Spelling correction — only \"Subhankar\" was ever recorded, correcting to the right spelling going forward", "merged": "2026-07-21"}
 ]
