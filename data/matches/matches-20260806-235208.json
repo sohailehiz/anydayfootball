@@ -1,0 +1,99 @@
+[
+  {
+    "date": "2026-08-05",
+    "yr": "2026",
+    "wd": "Wed",
+    "grp": "m",
+    "loc": "Apollo",
+    "time": "8pm - 10pm",
+    "p": [
+      {
+        "n": "Ichha",
+        "l": 1,
+        "f": 50,
+        "gs": 1
+      },
+      {
+        "n": "Vikranth"
+      },
+      {
+        "n": "Sohail",
+        "gs": 1,
+        "as": 3
+      },
+      {
+        "n": "Irfan",
+        "l": 1,
+        "f": 50,
+        "gs": 2,
+        "as": 4
+      },
+      {
+        "n": "Akhil",
+        "gs": 12,
+        "as": 2
+      },
+      {
+        "n": "Sampath",
+        "gs": 5,
+        "as": 3
+      },
+      {
+        "n": "Disha"
+      },
+      {
+        "n": "Shubhankar",
+        "gs": 1
+      },
+      {
+        "n": "Saif",
+        "gs": 3,
+        "as": 1
+      },
+      {
+        "n": "Rahul",
+        "l": 1,
+        "f": 50
+      },
+      {
+        "n": "Kewal"
+      },
+      {
+        "n": "Aditya",
+        "l": 1,
+        "f": 50
+      },
+      {
+        "n": "Srav"
+      },
+      {
+        "n": "Vineet"
+      },
+      {
+        "n": "Pranney"
+      },
+      {
+        "n": "Kushal",
+        "gs": 3
+      },
+      {
+        "n": "Asad",
+        "l": 1,
+        "f": 50,
+        "gs": 1,
+        "as": 1
+      },
+      {
+        "n": "Garima"
+      },
+      {
+        "n": "Kaushik",
+        "l": 1,
+        "f": 50
+      }
+    ],
+    "d": [],
+    "total": 6400,
+    "perHead": 338
+  }
+]
