@@ -1,0 +1,57 @@
+[
+  {
+    "date": "2026-08-07",
+    "yr": "2026",
+    "wd": "Fri",
+    "grp": "m",
+    "loc": "Turfside",
+    "time": "7 pm - 8 pm",
+    "p": [
+      {
+        "n": "Sonal"
+      },
+      {
+        "n": "Ichha",
+        "gs": 2,
+        "as": 3
+      },
+      {
+        "n": "Kaushik",
+        "gs": 3,
+        "as": 1
+      },
+      {
+        "n": "Shubhankar"
+      },
+      {
+        "n": "Akhil"
+      },
+      {
+        "n": "Rahul"
+      },
+      {
+        "n": "Aishna"
+      },
+      {
+        "n": "Srav"
+      },
+      {
+        "n": "Pratyusha"
+      },
+      {
+        "n": "Vikranth"
+      },
+      {
+        "n": "Shardul"
+      },
+      {
+        "n": "Kushal",
+        "gs": 3,
+        "as": 1
+      }
+    ],
+    "d": [],
+    "total": 3504,
+    "perHead": 292
+  }
+]
