@@ -1,0 +1,95 @@
+[
+  {
+    "date": "2026-09-30",
+    "yr": "2026",
+    "wd": "Wed",
+    "grp": "m",
+    "loc": "Apollo",
+    "time": "8pm - 10pm",
+    "p": [
+      {
+        "n": "Salman",
+        "gs": 2
+      },
+      {
+        "n": "Vishnu",
+        "gs": 1,
+        "as": 1
+      },
+      {
+        "n": "Jason",
+        "gs": 2,
+        "as": 2
+      },
+      {
+        "n": "Sampath",
+        "gs": 4,
+        "as": 4
+      },
+      {
+        "n": "Sahib",
+        "l": 1,
+        "f": 50
+      },
+      {
+        "n": "Garima"
+      },
+      {
+        "n": "Rahul",
+        "l": 1,
+        "f": 50
+      },
+      {
+        "n": "Pranney",
+        "l": 1,
+        "f": 50
+      },
+      {
+        "n": "Irfang1",
+        "as": 2
+      },
+      {
+        "n": "ayushi"
+      },
+      {
+        "n": "Sujan",
+        "l": 1,
+        "f": 50
+      },
+      {
+        "n": "Iccha a4g2",
+        "l": 1,
+        "f": 50
+      },
+      {
+        "n": "Kewal"
+      },
+      {
+        "n": "Kushal",
+        "gs": 8,
+        "as": 3
+      },
+      {
+        "n": "Asad",
+        "gs": 3,
+        "as": 2
+      },
+      {
+        "n": "Disha",
+        "l": 1,
+        "f": 50
+      },
+      {
+        "n": "Shubhankar"
+      },
+      {
+        "n": "Emmi",
+        "l": 1,
+        "f": 50
+      }
+    ],
+    "d": [],
+    "total": 6630,
+    "perHead": 349
+  }
+]
