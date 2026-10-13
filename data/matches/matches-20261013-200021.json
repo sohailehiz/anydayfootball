@@ -31,7 +31,9 @@
         "n": "Rahul"
       },
       {
-        "n": "Sampath"
+        "n": "Sampath",
+	"gs": 7,
+        "as": 4
       },
       {
         "n": "Sahib"
