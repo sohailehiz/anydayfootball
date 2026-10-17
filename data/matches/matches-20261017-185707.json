@@ -1,0 +1,88 @@
+[
+  {
+    "date": "2026-10-14",
+    "yr": "2026",
+    "wd": "Wed",
+    "grp": "m",
+    "loc": "Apollo",
+    "time": "8pm - 10pm",
+    "p": [
+      {
+        "n": "Ichha",
+        "gs": 2,
+        "as": 6
+      },
+      {
+        "n": "Shubhankar"
+      },
+      {
+        "n": "Kushal",
+        "gs": 5,
+        "as": 3
+      },
+      {
+        "n": "Asad"
+      },
+      {
+        "n": "Pranney"
+      },
+      {
+        "n": "Garima"
+      },
+      {
+        "n": "Emmy"
+      },
+      {
+        "n": "Megha"
+      },
+      {
+        "n": "Vishnu",
+        "gs": 1,
+        "as": 2
+      },
+      {
+        "n": "Kewal"
+      },
+      {
+        "n": "Sampath",
+        "gs": 5,
+        "as": 3
+      },
+      {
+        "n": "Rahul"
+      },
+      {
+        "n": "Vineet"
+      },
+      {
+        "n": "Disha"
+      },
+      {
+        "n": "Jason",
+        "gs": 1,
+        "as": 1
+      },
+      {
+        "n": "Vivi",
+        "gs": 6,
+        "as": 1
+      },
+      {
+        "n": "Jagmeet",
+        "gs": 2,
+        "as": 4
+      },
+      {
+        "n": "Irfan",
+        "gs": 1,
+        "as": 2
+      },
+      {
+        "n": "Sahib"
+      }
+    ],
+    "d": [],
+    "total": 7100,
+    "perHead": 395
+  }
+]
