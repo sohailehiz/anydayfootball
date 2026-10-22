@@ -704,7 +704,7 @@ function cardHTML(s, rank, topGA){
   const yearTotalGames = MATCHES.filter(m=>m.yr===currentYear).length;
   const yearGoals = s.goalsByYear.get(currentYear) || 0;
   const yearAssists = s.assistsByYear.get(currentYear) || 0;
-  const gaScore = computeGoalsAssistsScore(yearGoals, yearAssists, topGA);
+  const gaScore = (yearGoals+yearAssists) || 0;//computeGoalsAssistsScore(yearGoals, yearAssists, topGA);
   const overall = computeOverall(yearGamesPlayed, yearTotalGames, ratings, gaScore);
   const tier = computeTier(overall);
   const stars = computeStars(overall);
